@@ -1,0 +1,73 @@
+{
+  "name": "hqm",
+  "version": "1.0.0",
+  "description": "CLI for monitoring multiple Claude Code sessions in real-time (Linux)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "hqm": "dist/bin/hqm.js"
+  },
+  "files": [
+    "dist",
+    "public",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "tsx watch src/bin/hqm.tsx",
+    "build": "tsc",
+    "start": "node dist/bin/hqm.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "monitor",
+    "cli",
+    "tui",
+    "terminal",
+    "session",
+    "linux",
+    "tmux"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "os": [
+    "linux"
+  ],
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "commander": "^13.1.0",
+    "ink": "^5.2.0",
+    "qrcode-terminal": "^0.12.0",
+    "react": "^18.3.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.11",
+    "@types/node": "^22.15.30",
+    "@types/react": "^18.3.12",
+    "@types/ws": "^8.5.13",
+    "@vitest/coverage-v8": "^4.0.17",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vitest": "^4.0.17"
+  }
+}

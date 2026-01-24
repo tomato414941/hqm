@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>HQM - Mobile Monitor</title>
+  <script src="lib/marked.min.js"></script>
+  <script src="lib/purify.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-primary: #0a0a0a;
+      --bg-card: #141414;
+      --bg-card-hover: #1a1a1a;
+      --bg-input: #1e1e1e;
+      --border-subtle: #2a2a2a;
+      --border-default: #3a3a3a;
+      --text-primary: #f5f5f5;
+      --text-secondary: #a8a8a8;
+      --text-muted: #666;
+      --status-running: #22c55e;
+      --status-running-bg: rgba(34, 197, 94, 0.15);
+      --status-running-border: rgba(34, 197, 94, 0.4);
+      --status-waiting: #f59e0b;
+      --status-waiting-bg: rgba(245, 158, 11, 0.15);
+      --status-waiting-border: rgba(245, 158, 11, 0.4);
+      --status-stopped: #71717a;
+      --status-stopped-bg: rgba(113, 113, 122, 0.1);
+      --status-stopped-border: rgba(113, 113, 122, 0.3);
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --accent-glow: rgba(99, 102, 241, 0.3);
+      --danger: #ef4444;
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
+
+    :root.light {
+      --bg-primary: #f5f5f7;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f0f0f2;
+      --bg-input: #f0f0f2;
+      --border-subtle: #c7c7cc;
+      --border-default: #aeaeb2;
+      --text-primary: #1c1c1e;
+      --text-secondary: #48484a;
+      --text-muted: #8e8e93;
+      --status-running: #28a745;
+      --status-running-bg: rgba(40, 167, 69, 0.12);
+      --status-running-border: rgba(40, 167, 69, 0.6);
+      --status-waiting: #e67700;
+      --status-waiting-bg: rgba(230, 119, 0, 0.12);
+      --status-waiting-border: rgba(230, 119, 0, 0.6);
+      --status-stopped: #6c757d;
+      --status-stopped-bg: rgba(108, 117, 125, 0.08);
+      --status-stopped-border: rgba(108, 117, 125, 0.5);
+      --accent: #5856d6;
+      --accent-hover: #4f46e5;
+      --accent-glow: rgba(88, 86, 214, 0.3);
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+      --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.18);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      min-height: 100dvh;
+      padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0) 0;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+    }
+
+    .app {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .icon-btn {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-card);
+      border: 1px solid var(--border-default);
+      border-radius: 50%;
+      font-size: 18px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.15s ease;
+    }
+
+    .icon-btn:active {
+      background: var(--bg-card-hover);
+      transform: scale(0.92);
+    }
+
+    .icon-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+
+    .conn-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--danger);
+      box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px rgba(239, 68, 68, 0.3);
+      transition: all 0.3s ease;
+      flex-shrink: 0;
+    }
+
+    .conn-indicator.online {
+      background: var(--status-running);
+      box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--status-running-bg), 0 0 12px var(--status-running);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.9); }
+    }
+
+    .sessions {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      border: 2px solid var(--border-default);
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+
+    .card:active {
+      transform: scale(0.98);
+    }
+
+    .card.running {
+      border-color: var(--status-running);
+      box-shadow: var(--shadow-md), 0 0 0 1px var(--status-running-border), 0 0 24px var(--status-running-bg);
+    }
+
+    .card.waiting_input {
+      border-color: var(--status-waiting);
+      box-shadow: var(--shadow-md), 0 0 0 1px var(--status-waiting-border), 0 0 24px var(--status-waiting-bg);
+    }
+
+    .card.stopped {
+      border-color: var(--status-stopped-border);
+      opacity: 0.75;
+    }
+
+    .card-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .card-status-chevron {
+      margin-left: auto;
+      font-size: 18px;
+      opacity: 0.7;
+    }
+
+    .card.running .card-status {
+      background: var(--status-running-bg);
+      color: var(--status-running);
+    }
+
+    .card.waiting_input .card-status {
+      background: var(--status-waiting-bg);
+      color: var(--status-waiting);
+    }
+
+    .card.stopped .card-status {
+      background: var(--status-stopped-bg);
+      color: var(--status-stopped);
+    }
+
+    .card-status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .card.running .card-status-dot {
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .card.waiting_input .card-status-dot {
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    .card-body {
+      padding: 16px;
+    }
+
+    .card-name {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+      letter-spacing: -0.3px;
+    }
+
+    .card-path {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      word-break: break-all;
+    }
+
+    .card-message {
+      background: var(--bg-input);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+    }
+
+    .card-message-text {
+      font-size: 14px;
+      color: var(--text-primary);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-message-empty {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .modal-waiting-notice {
+      flex-shrink: 0;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border-subtle);
+      background: var(--status-waiting-bg);
+      text-align: center;
+    }
+
+    .modal-waiting-notice-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--status-waiting);
+    }
+
+    .empty {
+      text-align: center;
+      padding: 60px 24px;
+      background: var(--bg-card);
+      border: 2px solid var(--border-default);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .empty-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 60px 24px;
+      background: var(--bg-card);
+      border: 2px solid var(--border-default);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .loading-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border-default);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .toast {
+      position: fixed;
+      top: calc(env(safe-area-inset-top, 0) + 16px);
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: rgba(20, 20, 20, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: #ffffff;
+      padding: 14px 24px;
+      border-radius: var(--radius-lg);
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      z-index: 1100;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast.ok {
+      background: rgba(34, 197, 94, 0.98);
+      color: white;
+      box-shadow: var(--shadow-lg), 0 0 20px rgba(34, 197, 94, 0.4);
+    }
+
+    .toast.err {
+      background: rgba(239, 68, 68, 0.98);
+      color: white;
+      box-shadow: var(--shadow-lg), 0 0 20px rgba(239, 68, 68, 0.4);
+    }
+
+    .modal-bg {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+
+    .modal-bg.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-bottom: none;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      width: 100%;
+      max-width: 480px;
+      height: 80vh;
+      height: 80dvh;
+      transform: translateY(100%);
+      transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+      box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-bg.show .modal {
+      transform: translateY(0);
+    }
+
+    .modal-handle {
+      width: 40px;
+      height: 5px;
+      background: var(--border-default);
+      border-radius: 3px;
+      margin: 12px auto;
+      flex-shrink: 0;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      padding: 8px 20px 16px;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border-subtle);
+      gap: 12px;
+    }
+
+    .modal-header-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .modal-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .modal-header-path {
+      font-size: 13px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .modal-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .modal-focus-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 12px 18px;
+      min-height: 44px;
+      background: linear-gradient(135deg, var(--accent) 0%, #4f46e5 100%);
+      border: none;
+      border-radius: 22px;
+      color: white;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px var(--accent-glow);
+      transition: all 0.15s ease;
+    }
+
+    .modal-focus-btn:active {
+      transform: scale(0.95);
+    }
+
+    .modal-close {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: 50%;
+      color: var(--text-secondary);
+      font-size: 22px;
+      cursor: pointer;
+    }
+
+    .modal-close:active {
+      background: var(--bg-card-hover);
+      transform: scale(0.95);
+    }
+
+    .modal-message {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 16px 20px;
+      overflow: hidden;
+    }
+
+    .modal-message-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    .modal-message-content {
+      flex: 0 1 auto;
+      max-height: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      overflow-y: auto;
+      overflow-x: auto;
+      font-size: 15px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    .modal-message-content::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .modal-message-content::-webkit-scrollbar-thumb {
+      background: var(--border-default);
+      border-radius: 3px;
+    }
+
+    .modal-message-content p { margin: 0 0 14px; }
+    .modal-message-content p:last-child { margin-bottom: 0; }
+    .modal-message-content code {
+      background: var(--bg-primary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: 'SF Mono', Menlo, monospace;
+    }
+    .modal-message-content pre {
+      background: var(--bg-primary);
+      padding: 14px;
+      border-radius: var(--radius-sm);
+      overflow-x: auto;
+      margin: 14px 0;
+      font-size: 13px;
+      font-family: 'SF Mono', Menlo, monospace;
+      line-height: 1.5;
+    }
+    .modal-message-content pre code {
+      background: none;
+      padding: 0;
+    }
+    .modal-message-content ul, .modal-message-content ol {
+      margin: 14px 0;
+      padding-left: 24px;
+      list-style-position: inside;
+    }
+    .modal-message-content li {
+      margin: 8px 0;
+      text-indent: -4px;
+    }
+    .modal-message-content h1, .modal-message-content h2, .modal-message-content h3 {
+      margin: 18px 0 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .modal-message-content h1 { font-size: 20px; }
+    .modal-message-content h2 { font-size: 18px; }
+    .modal-message-content h3 { font-size: 16px; }
+    .modal-message-content blockquote {
+      margin: 14px 0;
+      padding: 12px 16px;
+      border-left: 3px solid var(--accent);
+      background: var(--bg-primary);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    }
+    .modal-message-content a {
+      color: var(--accent-hover);
+      text-decoration: none;
+    }
+    .modal-message-content table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 14px;
+    }
+    .modal-message-content th, .modal-message-content td {
+      padding: 10px 12px;
+      border: 1px solid var(--border-default);
+      text-align: left;
+      white-space: nowrap;
+    }
+    .modal-message-content th {
+      background: var(--bg-primary);
+      font-weight: 600;
+    }
+
+    .modal-message-empty {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .chat-messages {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 4px;
+    }
+
+    .chat-message {
+      max-width: 85%;
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      line-height: 1.6;
+      word-wrap: break-word;
+    }
+
+    .chat-message.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, var(--accent) 0%, #4f46e5 100%);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .chat-message.assistant {
+      align-self: flex-start;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-bottom-left-radius: 4px;
+    }
+
+    .chat-message p { margin: 0 0 10px; }
+    .chat-message p:last-child { margin-bottom: 0; }
+    .chat-message code {
+      background: rgba(0, 0, 0, 0.15);
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 13px;
+      font-family: 'SF Mono', Menlo, monospace;
+    }
+    .chat-message.assistant code {
+      background: var(--bg-input);
+    }
+    .chat-message pre {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 10px 0;
+      font-size: 12px;
+      font-family: 'SF Mono', Menlo, monospace;
+    }
+    .chat-message.assistant pre {
+      background: var(--bg-card);
+    }
+    .chat-message pre code {
+      background: none;
+      padding: 0;
+    }
+
+    .chat-load-more {
+      display: flex;
+      justify-content: center;
+      padding: 12px;
+    }
+
+    .chat-load-more-btn {
+      padding: 10px 20px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .chat-load-more-btn:active {
+      background: var(--bg-card-hover);
+      transform: scale(0.98);
+    }
+
+    .chat-load-more-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .chat-loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .chat-loading-spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border-default);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 10px;
+    }
+
+    .modal-input {
+      flex-shrink: 0;
+      padding: 16px 20px;
+      padding-bottom: calc(env(safe-area-inset-bottom, 0) + 16px);
+      border-top: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+    }
+
+    .modal-input-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .modal-input-field {
+      flex: 1;
+    }
+
+    .modal-input textarea {
+      width: 100%;
+      height: 50px;
+      max-height: 120px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 16px;
+      padding: 13px 14px;
+      resize: none;
+      transition: all 0.2s ease;
+    }
+
+    .modal-input textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    .modal-input textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .modal-warn {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--danger);
+      display: none;
+    }
+
+    .modal-warn.show {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-send-btn {
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--accent) 0%, #4f46e5 100%);
+      border: none;
+      border-radius: var(--radius-sm);
+      color: white;
+      font-size: 22px;
+      cursor: pointer;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px var(--accent-glow);
+      transition: all 0.2s ease;
+    }
+
+    .modal-send-btn:active {
+      transform: scale(0.95);
+    }
+
+    .modal-send-btn:disabled {
+      background: var(--bg-input);
+      color: var(--text-muted);
+      box-shadow: none;
+    }
+
+    .desktop-warning {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .desktop-warning-icon {
+      font-size: 64px;
+      margin-bottom: 24px;
+    }
+
+    .desktop-warning-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .desktop-warning-text {
+      font-size: 15px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    @media (min-width: 1025px) and (pointer: fine) {
+      .app, .toast, .modal-bg {
+        display: none !important;
+      }
+      .desktop-warning {
+        display: flex;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="desktop-warning">
+    <div class="desktop-warning-icon">📱</div>
+    <h1 class="desktop-warning-title">Mobile Only</h1>
+    <p class="desktop-warning-text">
+      This interface is designed for mobile devices.<br>
+      Scan the QR code displayed in your terminal to access from your phone.
+    </p>
+  </div>
+
+  <div class="app">
+    <header class="header">
+      <div class="header-left">
+        <h1 class="header-title">HQM</h1>
+        <div class="conn-indicator" id="connStatus"></div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">
+          <svg id="themeIcon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/>
+          </svg>
+        </button>
+        <button class="icon-btn" onclick="clearAllSessions()" title="Clear sessions" aria-label="Clear sessions">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="sessions" id="sessions">
+      <div class="loading">
+        <div class="loading-spinner"></div>
+        <span class="loading-text">Connecting...</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="modal-bg" id="modal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-header-info">
+          <h2 id="modalTitle">Project Name</h2>
+          <div class="modal-header-path" id="modalPath">~/path/to/project</div>
+        </div>
+        <div class="modal-header-actions">
+          <button class="modal-focus-btn" id="modalFocusBtn" onclick="focusFromModal()">
+            💻 Focus
+          </button>
+          <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+      </div>
+      <div class="modal-message">
+        <div class="modal-message-label" id="modalMessageLabel">Message</div>
+        <div class="modal-message-content" id="modalMessage">
+          <span class="modal-message-empty">No messages yet</span>
+        </div>
+      </div>
+      <div class="modal-waiting-notice" id="modalWaitingNotice" style="display: none;">
+        <div class="modal-waiting-notice-text">Permission required. Please respond on PC.</div>
+      </div>
+      <div class="modal-input">
+        <div class="modal-input-row">
+          <div class="modal-input-field">
+            <textarea id="msgInput" placeholder="Send a message..." rows="1"></textarea>
+            <div class="modal-warn" id="warn">
+              <span>!</span>
+              <span>Dangerous command detected</span>
+            </div>
+          </div>
+          <button class="modal-send-btn" id="sendBtn" onclick="sendMsg()" disabled>↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $sessions = document.getElementById('sessions');
+    const $connStatus = document.getElementById('connStatus');
+    const $toast = document.getElementById('toast');
+    const $themeIcon = document.getElementById('themeIcon');
+    const $modal = document.getElementById('modal');
+    const $modalTitle = document.getElementById('modalTitle');
+    const $modalPath = document.getElementById('modalPath');
+    const $modalMessageLabel = document.getElementById('modalMessageLabel');
+    const $modalMessage = document.getElementById('modalMessage');
+    const $modalWaitingNotice = document.getElementById('modalWaitingNotice');
+    const $msgInput = document.getElementById('msgInput');
+    const $sendBtn = document.getElementById('sendBtn');
+    const $warn = document.getElementById('warn');
+
+    const TOAST_DURATION_MS = 2500;
+    const RECONNECT_DELAY_MS = 2000;
+    const SEND_TIMEOUT_MS = 5000;
+    const SWIPE_THRESHOLD_PX = 100;
+
+    let ws = null;
+    let targetSession = null;
+    let pendingSend = null;
+    let sessionsData = [];
+    let historyMessages = [];
+    let historyHasMore = false;
+    let historyLoading = false;
+    let historyOffset = 0;
+    const HISTORY_PAGE_SIZE = 50;
+
+    $sessions.addEventListener('click', (e) => {
+      const card = e.target.closest('.card');
+      if (card && card.dataset.sessionId) {
+        openModal(card.dataset.sessionId);
+      }
+    });
+
+    const STATUS = {
+      running: 'Running',
+      waiting_input: 'Waiting for Input',
+      stopped: 'Stopped'
+    };
+
+    const DANGER = [
+      /rm\s+(-rf?|--recursive)/i,
+      /sudo\s+rm/i,
+      /mkfs/i,
+      /dd\s+if=/i,
+      />\s*\/dev\//i,
+      /chmod\s+777/i,
+      /curl.*\|\s*(ba)?sh/i,
+    ];
+
+    const THEME_KEY = 'hqm-theme';
+    const SUN_PATH = 'M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0a.996.996 0 0 0 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z';
+    const MOON_PATH = 'M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z';
+
+    function initTheme() {
+      const saved = localStorage.getItem(THEME_KEY);
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = saved ? saved === 'dark' : prefersDark;
+      document.documentElement.classList.toggle('light', !isDark);
+      updateThemeIcon(!isDark);
+    }
+
+    function updateThemeIcon(isLight) {
+      $themeIcon.querySelector('path').setAttribute('d', isLight ? MOON_PATH : SUN_PATH);
+    }
+
+    function toggleTheme() {
+      const isCurrentlyLight = document.documentElement.classList.contains('light');
+      document.documentElement.classList.toggle('light');
+      localStorage.setItem(THEME_KEY, isCurrentlyLight ? 'dark' : 'light');
+      updateThemeIcon(!isCurrentlyLight);
+    }
+
+    initTheme();
+
+    function toast(msg, type = '') {
+      $toast.textContent = msg;
+      $toast.className = `toast show ${type}`;
+      setTimeout(() => $toast.className = 'toast', TOAST_DURATION_MS);
+    }
+
+    function setConn(ok) {
+      $connStatus.className = ok ? 'conn-indicator online' : 'conn-indicator';
+    }
+
+    function getDirName(path) {
+      if (!path) return 'Unknown';
+      const parts = path.split('/').filter(p => p);
+      return parts[parts.length - 1] || path;
+    }
+
+    function formatPath(path) {
+      if (!path) return '';
+      return path.replace(/^\/home\/[^/]+/, '~');
+    }
+
+    function truncateMessage(text, maxLen = 100) {
+      if (!text) return '';
+      const clean = text.replace(/[#*`_~\[\]]/g, '').replace(/\s+/g, ' ').trim();
+      if (clean.length <= maxLen) return clean;
+      return clean.slice(0, maxLen) + '...';
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function isValidSessionId(id) {
+      return /^[a-zA-Z0-9_-]+$/.test(id);
+    }
+
+    function renderMarkdown(markdownText) {
+      if (!markdownText) return '<span class="modal-message-empty">No messages yet</span>';
+      if (typeof marked !== 'undefined') {
+        marked.setOptions({ breaks: true, gfm: true });
+        const html = marked.parse(markdownText);
+        if (typeof DOMPurify !== 'undefined') {
+          return DOMPurify.sanitize(html);
+        }
+        return html;
+      }
+      const container = document.createElement('div');
+      container.textContent = markdownText;
+      return container.innerHTML;
+    }
+
+    function getSessionById(id) {
+      return sessionsData.find(s => s.session_id === id);
+    }
+
+    function openModal(id) {
+      const session = getSessionById(id);
+      if (!session) return;
+
+      const isWaiting = session.status === 'waiting_input';
+
+      targetSession = id;
+      historyMessages = [];
+      historyHasMore = false;
+      historyOffset = 0;
+
+      $modalTitle.textContent = getDirName(session.cwd);
+      $modalPath.textContent = formatPath(session.cwd);
+      $modalMessageLabel.textContent = 'Conversation';
+      $modalMessage.innerHTML = '<div class="chat-loading"><div class="chat-loading-spinner"></div>Loading...</div>';
+      $msgInput.value = '';
+      $warn.classList.remove('show');
+      $sendBtn.disabled = true;
+
+      $modalWaitingNotice.style.display = isWaiting ? 'block' : 'none';
+      $msgInput.disabled = isWaiting;
+      $msgInput.placeholder = isWaiting ? 'Waiting for permission...' : 'Send a message...';
+
+      $modal.classList.add('show');
+      document.body.style.overflow = 'hidden';
+
+      // Request history
+      requestHistory(id, 0);
+
+      if (!isWaiting) {
+        setTimeout(() => $msgInput.focus(), 150);
+      }
+    }
+
+    function requestHistory(sessionId, offset) {
+      if (!ws || ws.readyState !== 1) return;
+      historyLoading = true;
+      ws.send(JSON.stringify({
+        type: 'getHistory',
+        sessionId,
+        limit: HISTORY_PAGE_SIZE,
+        offset,
+      }));
+    }
+
+    function renderChatMessages() {
+      if (historyMessages.length === 0) {
+        $modalMessage.innerHTML = '<span class="modal-message-empty">No messages yet</span>';
+        return;
+      }
+
+      let html = '';
+
+      if (historyHasMore) {
+        html += `<div class="chat-load-more">
+          <button class="chat-load-more-btn" onclick="loadMoreHistory()" ${historyLoading ? 'disabled' : ''}>
+            ${historyLoading ? 'Loading...' : 'Load older messages'}
+          </button>
+        </div>`;
+      }
+
+      html += '<div class="chat-messages">';
+      for (const msg of historyMessages) {
+        const content = msg.type === 'assistant' ? renderMarkdown(msg.content) : escapeHtml(msg.content);
+        html += `<div class="chat-message ${msg.type}">${content}</div>`;
+      }
+      html += '</div>';
+
+      const wasAtBottom = $modalMessage.scrollHeight - $modalMessage.scrollTop <= $modalMessage.clientHeight + 50;
+      const prevScrollHeight = $modalMessage.scrollHeight;
+
+      $modalMessage.innerHTML = html;
+
+      // Maintain scroll position when loading older messages, otherwise scroll to bottom
+      if (historyOffset === 0 || wasAtBottom) {
+        $modalMessage.scrollTop = $modalMessage.scrollHeight;
+      } else {
+        // Keep relative scroll position when prepending messages
+        $modalMessage.scrollTop = $modalMessage.scrollHeight - prevScrollHeight + $modalMessage.scrollTop;
+      }
+    }
+
+    function loadMoreHistory() {
+      if (!targetSession || historyLoading || !historyHasMore) return;
+      historyOffset += HISTORY_PAGE_SIZE;
+      requestHistory(targetSession, historyOffset);
+    }
+
+    function handleHistoryResponse(data) {
+      historyLoading = false;
+
+      if (data.sessionId !== targetSession) return;
+
+      if (data.offset === 0 || historyOffset === 0) {
+        // Initial load
+        historyMessages = data.messages || [];
+      } else {
+        // Prepend older messages
+        historyMessages = [...(data.messages || []), ...historyMessages];
+      }
+
+      historyHasMore = data.hasMore || false;
+      renderChatMessages();
+    }
+
+    function closeModal() {
+      $modal.classList.remove('show');
+      document.body.style.overflow = '';
+      targetSession = null;
+      historyMessages = [];
+      historyHasMore = false;
+      historyOffset = 0;
+      historyLoading = false;
+    }
+
+    function updateModalContent(session) {
+      if (!session) return;
+
+      const isWaiting = session.status === 'waiting_input';
+
+      $modalTitle.textContent = getDirName(session.cwd);
+      $modalPath.textContent = formatPath(session.cwd);
+
+      // Refresh history to get latest messages
+      if (targetSession === session.session_id && !historyLoading) {
+        requestHistory(session.session_id, 0);
+      }
+
+      $modalWaitingNotice.style.display = isWaiting ? 'block' : 'none';
+      $msgInput.disabled = isWaiting;
+      $msgInput.placeholder = isWaiting ? 'Waiting for permission...' : 'Send a message...';
+    }
+
+    function sendMsg() {
+      const text = $msgInput.value.trim();
+      if (!text || !targetSession) return;
+      if (!ws || ws.readyState !== 1) {
+        toast('Not connected', 'err');
+        return;
+      }
+      if (pendingSend) return;
+
+      pendingSend = targetSession;
+      $sendBtn.disabled = true;
+
+      ws.send(JSON.stringify({ type: 'sendText', sessionId: targetSession, text }));
+
+      setTimeout(() => {
+        if (pendingSend) {
+          pendingSend = null;
+          $sendBtn.disabled = !$msgInput.value.trim();
+          toast('Send timeout', 'err');
+        }
+      }, SEND_TIMEOUT_MS);
+    }
+
+    function focusFromModal() {
+      if (!targetSession) return;
+      if (!ws || ws.readyState !== 1) return toast('Not connected', 'err');
+      ws.send(JSON.stringify({ type: 'focus', sessionId: targetSession }));
+    }
+
+    function clearAllSessions() {
+      if (!ws || ws.readyState !== 1) return toast('Not connected', 'err');
+      ws.send(JSON.stringify({ type: 'clearSessions' }));
+    }
+
+    $msgInput.addEventListener('input', () => {
+      const text = $msgInput.value.trim();
+      $sendBtn.disabled = !text;
+      $warn.classList.toggle('show', DANGER.some(p => p.test(text)));
+      $msgInput.style.height = '50px';
+      $msgInput.style.height = Math.min($msgInput.scrollHeight, 120) + 'px';
+    });
+
+    $msgInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    $modal.addEventListener('click', (e) => {
+      if (e.target === $modal) closeModal();
+    });
+
+    let touchStartY = 0, currentTouchY = 0, isDragging = false;
+    const $modalContent = $modal.querySelector('.modal');
+    const $modalHandle = $modal.querySelector('.modal-handle');
+    const $modalHeader = $modal.querySelector('.modal-header');
+
+    function handleSwipeStart(e) {
+      touchStartY = currentTouchY = e.touches[0].clientY;
+      isDragging = true;
+      $modalContent.style.transition = 'none';
+    }
+
+    function handleSwipeMove(e) {
+      if (!isDragging) return;
+      currentTouchY = e.touches[0].clientY;
+      const d = currentTouchY - touchStartY;
+      if (d > 0) {
+        $modalContent.style.transform = `translateY(${d}px)`;
+      }
+    }
+
+    function handleSwipeEnd() {
+      if (!isDragging) return;
+      isDragging = false;
+      $modalContent.style.transition = 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)';
+      const swipeDistance = currentTouchY - touchStartY;
+      if (swipeDistance > SWIPE_THRESHOLD_PX) {
+        closeModal();
+        setTimeout(() => { $modalContent.style.transform = ''; }, 300);
+      } else {
+        $modalContent.style.transform = '';
+      }
+    }
+
+    $modalHandle.addEventListener('touchstart', handleSwipeStart, { passive: true });
+    $modalHandle.addEventListener('touchmove', handleSwipeMove, { passive: true });
+    $modalHandle.addEventListener('touchend', handleSwipeEnd);
+    $modalHeader.addEventListener('touchstart', handleSwipeStart, { passive: true });
+    $modalHeader.addEventListener('touchmove', handleSwipeMove, { passive: true });
+    $modalHeader.addEventListener('touchend', handleSwipeEnd);
+
+    function render(list) {
+      sessionsData = list || [];
+
+      if (targetSession) {
+        const session = getSessionById(targetSession);
+        if (session) {
+          updateModalContent(session);
+        } else {
+          closeModal();
+        }
+      }
+
+      if (!list || !list.length) {
+        $sessions.innerHTML = `
+          <div class="empty">
+            <div class="empty-icon">📋</div>
+            <div class="empty-title">No Active Sessions</div>
+            <div class="empty-text">Start a Claude Code session to monitor it here</div>
+          </div>`;
+        return;
+      }
+
+      $sessions.innerHTML = list.map(session => {
+        if (!isValidSessionId(session.session_id)) return '';
+
+        const dirName = escapeHtml(getDirName(session.cwd));
+        const shortPath = escapeHtml(formatPath(session.cwd));
+        const statusLabel = escapeHtml(STATUS[session.status]);
+        const msgPreview = escapeHtml(truncateMessage(session.lastMessage || session.last_prompt));
+        const safeStatus = escapeHtml(session.status);
+
+        return `
+          <div class="card ${safeStatus}" data-session-id="${escapeHtml(session.session_id)}">
+            <div class="card-status">
+              <span class="card-status-dot"></span>
+              <span>${statusLabel}</span>
+              <span class="card-status-chevron">›</span>
+            </div>
+            <div class="card-body">
+              <div class="card-name">${dirName}</div>
+              <div class="card-path">${shortPath}</div>
+              <div class="card-message">
+                ${msgPreview
+                  ? `<div class="card-message-text">${msgPreview}</div>`
+                  : `<div class="card-message-empty">No messages yet</div>`
+                }
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function connect() {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+
+      if (!token) {
+        $sessions.innerHTML = `
+          <div class="empty">
+            <div class="empty-icon">🔒</div>
+            <div class="empty-title">Unauthorized</div>
+            <div class="empty-text">Please scan the QR code from the terminal</div>
+          </div>`;
+        setConn(false);
+        return;
+      }
+
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${proto}//${location.host}?token=${token}`);
+
+      ws.onopen = () => {
+        setConn(true);
+        pendingSend = null;
+      };
+      ws.onclose = () => {
+        setConn(false);
+        pendingSend = null;
+        setTimeout(connect, RECONNECT_DELAY_MS);
+      };
+      ws.onerror = () => {
+        setConn(false);
+        pendingSend = null;
+      };
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'sessions') {
+            render(msg.data);
+          } else if (msg.type === 'history') {
+            handleHistoryResponse(msg);
+          } else if (msg.type === 'focusResult') {
+            if (!msg.success) toast('Failed', 'err');
+          } else if (msg.type === 'sendTextResult') {
+            pendingSend = null;
+            $sendBtn.disabled = !$msgInput.value.trim();
+            if (!msg.success) {
+              toast(msg.error || 'Failed', 'err');
+            } else {
+              $msgInput.value = '';
+              $msgInput.style.height = '50px';
+              $sendBtn.disabled = true;
+            }
+          } else if (msg.type === 'clearSessionsResult') {
+            if (!msg.success) toast(msg.error || 'Failed', 'err');
+          }
+        } catch {}
+      };
+    }
+
+    connect();
+
+    document.body.addEventListener('touchmove', (e) => {
+      if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+  </script>
+</body>
+</html>
