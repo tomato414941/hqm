@@ -14,9 +14,13 @@ const MIN_WIDTH_FOR_QR = 80;
 
 interface DashboardProps {
   showQR?: boolean;
+  showUrl?: boolean;
 }
 
-export function Dashboard({ showQR: showQRProp = true }: DashboardProps): React.ReactElement {
+export function Dashboard({
+  showQR: showQRProp = true,
+  showUrl: showUrlProp = true,
+}: DashboardProps): React.ReactElement {
   const { sessions, loading, error } = useSessions();
   const { qrCode, url, loading: serverLoading } = useServer();
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -26,7 +30,12 @@ export function Dashboard({ showQR: showQRProp = true }: DashboardProps): React.
   const terminalHeight = stdout?.rows ?? 0;
   const terminalWidth = stdout?.columns ?? 0;
   const showQR =
-    showQRProp && terminalHeight >= MIN_HEIGHT_FOR_QR && terminalWidth >= MIN_WIDTH_FOR_QR && !!qrCode;
+    showQRProp &&
+    showUrlProp &&
+    terminalHeight >= MIN_HEIGHT_FOR_QR &&
+    terminalWidth >= MIN_WIDTH_FOR_QR &&
+    !!qrCode;
+  const showUrlText = showUrlProp && !showQR && url && !serverLoading;
 
   const focusSessionByIndex = (index: number) => {
     const session = sessions[index];
@@ -148,7 +157,7 @@ export function Dashboard({ showQR: showQRProp = true }: DashboardProps): React.
           <Text dimColor>[q]Quit</Text>
         </Box>
 
-        {!showQR && url && !serverLoading && (
+        {showUrlText && (
           <Box justifyContent="center" marginTop={1}>
             <Text dimColor>📱 {url}</Text>
           </Box>

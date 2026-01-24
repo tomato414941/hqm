@@ -1,4 +1,4 @@
-# HQM - Claude Code Session Monitor
+# HQM
 
 A TUI/Web dashboard for monitoring multiple Claude Code sessions in real-time on Linux.
 

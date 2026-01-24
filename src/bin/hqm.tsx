@@ -41,15 +41,21 @@ async function runWithAltScreen(renderFn: () => ReturnType<typeof render>) {
 
 const program = new Command();
 
-program.name('hqm').description('HQM - TUI dashboard for monitoring Claude Code sessions on Linux').version(pkg.version);
+program
+  .name('hqm')
+  .description('HQM - TUI dashboard for monitoring Claude Code sessions on Linux')
+  .version(pkg.version)
+  .option('--no-qr', 'Disable QR code display')
+  .option('--no-url', 'Disable URL display (implies --no-qr)');
 
 program
   .command('watch')
   .alias('w')
   .description('Start the monitoring TUI')
   .option('--no-qr', 'Disable QR code display')
-  .action(async (options: { qr: boolean }) => {
-    await runWithAltScreen(() => render(<Dashboard showQR={options.qr} />));
+  .option('--no-url', 'Disable URL display (implies --no-qr)')
+  .action(async (options: { qr: boolean; url: boolean }) => {
+    await runWithAltScreen(() => render(<Dashboard showQR={options.qr} showUrl={options.url} />));
   });
 
 program
@@ -142,12 +148,17 @@ configCmd
     }
   });
 
+interface GlobalOptions {
+  qr: boolean;
+  url: boolean;
+}
+
 /**
- * Default action (when launched without arguments)
+ * Default action (when launched without arguments or with only global options)
  * - Run setup if not configured
  * - Launch monitor if already configured
  */
-async function defaultAction() {
+async function defaultAction(options: GlobalOptions) {
   if (!isHooksConfigured()) {
     console.log('Initial setup required.\n');
     await setupHooks();
@@ -161,12 +172,13 @@ async function defaultAction() {
   }
 
   // Launch monitor
-  await runWithAltScreen(() => render(<Dashboard />));
+  await runWithAltScreen(() => render(<Dashboard showQR={options.qr} showUrl={options.url} />));
 }
 
-// Default action when executed without commands
-if (process.argv.length === 2) {
-  defaultAction().catch(console.error);
-} else {
-  program.parse();
-}
+// Set default action when no subcommand is provided
+program.action(async () => {
+  const options = program.opts<GlobalOptions>();
+  await defaultAction(options);
+});
+
+program.parseAsync().catch(console.error);

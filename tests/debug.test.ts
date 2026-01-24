@@ -28,7 +28,9 @@ describe('debugLog', () => {
     debugLog('test message');
 
     expect(mkdirSyncMock).toHaveBeenCalledTimes(1);
-    expect(mkdirSyncMock).toHaveBeenCalledWith(expect.stringContaining('.hqm'), { recursive: true });
+    expect(mkdirSyncMock).toHaveBeenCalledWith(expect.stringContaining('.hqm'), {
+      recursive: true,
+    });
 
     expect(appendFileSyncMock).toHaveBeenCalledTimes(1);
     expect(appendFileSyncMock).toHaveBeenCalledWith(
