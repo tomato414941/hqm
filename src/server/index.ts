@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createServer as createNetServer } from 'node:net';
-import { homedir, networkInterfaces } from 'node:os';
+import { networkInterfaces } from 'node:os';
 import { dirname, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import chokidar from 'chokidar';
@@ -20,7 +20,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PORT = 3456;
 const MAX_PORT_ATTEMPTS = 10;
 
-function isPortAvailable(port: number): Promise<boolean> {
+export function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const server = createNetServer();
     server.once('error', () => {
@@ -36,7 +36,7 @@ function isPortAvailable(port: number): Promise<boolean> {
   });
 }
 
-async function findAvailablePort(startPort: number): Promise<number> {
+export async function findAvailablePort(startPort: number): Promise<number> {
   for (let i = 0; i < MAX_PORT_ATTEMPTS; i++) {
     const port = startPort + i;
     if (await isPortAvailable(port)) {
@@ -48,14 +48,8 @@ async function findAvailablePort(startPort: number): Promise<number> {
   );
 }
 
-function generateAuthToken(): string {
+export function generateAuthToken(): string {
   return randomBytes(32).toString('hex');
-}
-
-function saveUrlToFile(url: string): void {
-  const hqmDir = resolve(homedir(), '.hqm');
-  mkdirSync(hqmDir, { recursive: true });
-  writeFileSync(resolve(hqmDir, 'web-url.txt'), url, 'utf-8');
 }
 
 interface WebSocketMessage {
@@ -86,7 +80,7 @@ const DANGEROUS_COMMAND_PATTERNS: RegExp[] = [
   /wget.*\|\s*(ba)?sh/i,
 ];
 
-function isDangerousCommand(text: string): boolean {
+export function isDangerousCommand(text: string): boolean {
   return DANGEROUS_COMMAND_PATTERNS.some((pattern) => pattern.test(text));
 }
 
@@ -95,7 +89,7 @@ async function findSessionById(sessionId: string): Promise<Session | undefined> 
   return sessions.find((s) => s.session_id === sessionId);
 }
 
-async function handleFocusCommand(ws: WebSocket, sessionId: string): Promise<void> {
+export async function handleFocusCommand(ws: WebSocket, sessionId: string): Promise<void> {
   const session = await findSessionById(sessionId);
   if (!session?.tty) {
     ws.send(
@@ -111,7 +105,7 @@ async function handleFocusCommand(ws: WebSocket, sessionId: string): Promise<voi
   ws.send(JSON.stringify({ type: 'focusResult', success }));
 }
 
-async function handleSendTextCommand(
+export async function handleSendTextCommand(
   ws: WebSocket,
   sessionId: string,
   text: string
@@ -153,7 +147,7 @@ async function handleSendKeystrokeCommand(
   ws.send(JSON.stringify({ type: 'sendKeystrokeResult', ...result }));
 }
 
-function handleClearSessionsCommand(ws: WebSocket): void {
+export function handleClearSessionsCommand(ws: WebSocket): void {
   try {
     clearSessions();
     ws.send(JSON.stringify({ type: 'clearSessionsResult', success: true }));
@@ -168,7 +162,7 @@ function handleClearSessionsCommand(ws: WebSocket): void {
   }
 }
 
-async function handleGetHistoryCommand(
+export async function handleGetHistoryCommand(
   ws: WebSocket,
   sessionId: string,
   limit = 50,
@@ -239,7 +233,7 @@ function handleWebSocketMessage(ws: WebSocket, data: Buffer): void {
   }
 }
 
-function broadcastToClients(wss: WebSocketServer, message: BroadcastMessage): void {
+export function broadcastToClients(wss: WebSocketServer, message: BroadcastMessage): void {
   const data = JSON.stringify(message);
   for (const client of wss.clients) {
     if (client.readyState === WEBSOCKET_OPEN) {
@@ -309,7 +303,7 @@ export function generateQRCode(text: string): Promise<string> {
   });
 }
 
-function getContentType(path: string): string {
+export function getContentType(path: string): string {
   if (path.endsWith('.html')) return 'text/html';
   if (path.endsWith('.css')) return 'text/css';
   if (path.endsWith('.js')) return 'application/javascript';
