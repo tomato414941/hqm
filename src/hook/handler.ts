@@ -1,4 +1,5 @@
-import { flushPendingWrites, updateSession } from '../store/file-store.js';
+import { generateSummary, isSummaryEnabled } from '../services/summary.js';
+import { flushPendingWrites, updateSession, updateSessionSummary } from '../store/file-store.js';
 import type { HookEvent, HookEventName } from '../types/index.js';
 import { endPerf, startPerf } from '../utils/perf.js';
 import { buildTranscriptPath } from '../utils/transcript.js';
@@ -89,6 +90,18 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
   };
 
   updateSession(event);
+
+  // Generate summary on Stop event if enabled
+  if (eventName === 'Stop' && isSummaryEnabled() && event.transcript_path) {
+    try {
+      const result = await generateSummary(event.transcript_path);
+      if (result?.summary) {
+        updateSessionSummary(event.session_id, event.tty, result.summary);
+      }
+    } catch {
+      // Summary generation failure should not block the hook
+    }
+  }
 
   // Ensure data is written before process exits (hooks are short-lived processes)
   await flushPendingWrites();

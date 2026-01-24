@@ -30,6 +30,7 @@ export interface Session {
   current_tool?: string;
   notification_type?: string;
   lastMessage?: string;
+  summary?: string;
 }
 
 // File store data structure

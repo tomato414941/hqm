@@ -5,8 +5,15 @@ import { render } from 'ink';
 import { Dashboard } from '../components/Dashboard.js';
 import { handleHookEvent } from '../hook/handler.js';
 import { startServer } from '../server/index.js';
-import { isHooksConfigured, setupHooks } from '../setup/index.js';
-import { getConfigPath, readConfig, setSessionTimeout } from '../store/config.js';
+import { isHooksConfigured, setupHooks, setupSummaryConfig } from '../setup/index.js';
+import {
+  disableSummary,
+  enableSummary,
+  getConfigPath,
+  getSummaryConfig,
+  readConfig,
+  setSessionTimeout,
+} from '../store/config.js';
 import { clearSessions, getSessions } from '../store/file-store.js';
 import { debugLog } from '../utils/debug.js';
 import { abbreviateHomePath } from '../utils/path.js';
@@ -146,6 +153,58 @@ configCmd
         console.log(`Session timeout set to ${value} minutes`);
       }
     }
+  });
+
+const summaryCmd = configCmd.command('summary').description('Manage AI summary configuration');
+
+summaryCmd
+  .command('show', { isDefault: true })
+  .description('Show current summary configuration')
+  .action(() => {
+    const summary = getSummaryConfig();
+    console.log('AI Summary Configuration');
+    console.log('------------------------');
+    if (!summary) {
+      console.log('Status: not configured');
+    } else {
+      console.log(`Status: ${summary.enabled ? 'enabled' : 'disabled'}`);
+      console.log(`Provider: ${summary.provider}`);
+      console.log(
+        `API Key: ${summary.apiKey ? `${summary.apiKey.slice(0, 7)}...${summary.apiKey.slice(-4)}` : 'not set'}`
+      );
+      console.log(`Model: ${summary.model || 'claude-haiku-4-20250514 (default)'}`);
+    }
+    console.log(`Config file: ${getConfigPath()}`);
+  });
+
+summaryCmd
+  .command('enable')
+  .description('Enable AI summary (requires API key to be set)')
+  .action(async () => {
+    const summary = getSummaryConfig();
+    if (!summary?.apiKey) {
+      console.log('API key not set. Running setup...');
+      console.log('');
+      await setupSummaryConfig();
+    } else {
+      enableSummary(summary.apiKey, summary.model);
+      console.log('AI summary enabled');
+    }
+  });
+
+summaryCmd
+  .command('disable')
+  .description('Disable AI summary (keeps API key for re-enabling)')
+  .action(() => {
+    disableSummary();
+    console.log('AI summary disabled');
+  });
+
+summaryCmd
+  .command('setup')
+  .description('Configure AI summary (API key)')
+  .action(async () => {
+    await setupSummaryConfig();
   });
 
 interface GlobalOptions {

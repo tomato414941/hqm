@@ -254,3 +254,23 @@ export function clearSessions(): void {
 export function getStorePath(): string {
   return STORE_FILE;
 }
+
+/**
+ * Update session with summary
+ */
+export function updateSessionSummary(
+  sessionId: string,
+  tty: string | undefined,
+  summary: string
+): void {
+  const store = readStore();
+  const key = getSessionKey(sessionId, tty);
+  const session = store.sessions[key];
+
+  if (session) {
+    session.summary = summary;
+    session.updated_at = new Date().toISOString();
+    store.sessions[key] = session;
+    writeStore(store);
+  }
+}

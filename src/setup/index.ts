@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { PACKAGE_NAME } from '../constants.js';
-import { askConfirmation } from '../utils/prompt.js';
+import { enableSummary, getConfigPath, getSummaryConfig } from '../store/config.js';
+import { askConfirmation, askInput } from '../utils/prompt.js';
 import {
   applyHooksToSettings,
   areAllHooksConfigured,
@@ -113,6 +114,55 @@ export async function setupHooks(): Promise<void> {
 
   console.log('');
   console.log(`Setup complete! Added ${hooksToAdd.length} hook(s) to ${SETTINGS_FILE}`);
+
+  // Ask about AI summary configuration
+  await setupSummaryConfig();
+
   console.log('');
   console.log(`Start monitoring with: ${baseCommand}`);
+}
+
+/**
+ * Interactive setup for AI summary configuration
+ */
+export async function setupSummaryConfig(): Promise<void> {
+  console.log('');
+  console.log('AI Summary Configuration');
+  console.log('------------------------');
+
+  const existingConfig = getSummaryConfig();
+  if (existingConfig?.enabled && existingConfig?.apiKey) {
+    console.log('AI summary is already configured and enabled.');
+    const reconfigure = await askConfirmation('Do you want to reconfigure it?');
+    if (!reconfigure) {
+      return;
+    }
+  }
+
+  console.log('');
+  console.log('AI summary generates a brief summary when Claude Code sessions end.');
+  console.log('This requires a separate Anthropic API key (not your Claude Code subscription).');
+  console.log('');
+
+  const enable = await askConfirmation('Enable AI summary feature?');
+  if (!enable) {
+    console.log('AI summary disabled.');
+    return;
+  }
+
+  console.log('');
+  console.log('Enter your Anthropic API key.');
+  console.log('Get one at: https://console.anthropic.com/settings/keys');
+  console.log('');
+
+  const apiKey = await askInput('API key', { mask: true });
+  if (!apiKey || !apiKey.startsWith('sk-')) {
+    console.log('');
+    console.log('Invalid API key format. AI summary not configured.');
+    return;
+  }
+
+  enableSummary(apiKey);
+  console.log('');
+  console.log(`AI summary enabled! Configuration saved to ${getConfigPath()}`);
 }
