@@ -15,7 +15,7 @@ export const TTY_CACHE_TTL_MS = 30_000;
 export const MAX_TTY_CACHE_SIZE = 100;
 
 /** Debounce delay for useSessions updates in milliseconds */
-export const SESSION_UPDATE_DEBOUNCE_MS = 150;
+export const SESSION_UPDATE_DEBOUNCE_MS = 250;
 
 /** Debounce delay for JSON file writes in milliseconds */
 export const WRITE_DEBOUNCE_MS = 100;
