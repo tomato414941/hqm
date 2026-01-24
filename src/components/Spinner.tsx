@@ -1,6 +1,6 @@
 import { Text } from 'ink';
 import type React from 'react';
-import { useSyncExternalStore } from 'react';
+import { memo, useSyncExternalStore } from 'react';
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 const FRAME_INTERVAL_MS = 120; // Slightly slower for less CPU usage
@@ -45,8 +45,10 @@ interface SpinnerProps {
   color?: string;
 }
 
-export function Spinner({ color = 'green' }: SpinnerProps): React.ReactElement {
+export const Spinner = memo(function Spinner({
+  color = 'green',
+}: SpinnerProps): React.ReactElement {
   const frame = useSyncExternalStore(subscribe, getSnapshot);
 
   return <Text color={color}>{SPINNER_FRAMES[frame]}</Text>;
-}
+});
