@@ -109,8 +109,15 @@ export function Dashboard({
 
   const { running, waiting_input: waitingInput, stopped } = statusCounts;
 
+  // Fixed height for stable rendering on remote terminals
+  const maxSessions = 9;
+  const headerHeight = 3; // Header box
+  const footerHeight = 2; // Footer help text
+  const sessionHeight = 4; // Each session card (approximate)
+  const minHeight = headerHeight + footerHeight + maxSessions * sessionHeight;
+
   return (
-    <Box flexDirection="row">
+    <Box flexDirection="row" minHeight={Math.min(minHeight, terminalHeight - 2)}>
       <Box flexDirection="column" flexGrow={1}>
         <Box borderStyle="round" borderColor="cyan" paddingX={1}>
           <Text bold color="cyan">

@@ -24,7 +24,7 @@ const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
 
 // Alternate screen buffer escape sequences
-const ENTER_ALT_SCREEN = '\x1b[?1049h\x1b[H';
+const ENTER_ALT_SCREEN = '\x1b[?1049h\x1b[H\x1b[2J'; // Enter alt screen + move home + clear
 const EXIT_ALT_SCREEN = '\x1b[?1049l';
 
 /**

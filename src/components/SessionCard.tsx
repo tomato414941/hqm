@@ -34,7 +34,7 @@ const LINE_INDENT = '      ';
 
 function arePropsEqual(prevProps: SessionCardProps, nextProps: SessionCardProps): boolean {
   if (prevProps.isSelected !== nextProps.isSelected) return false;
-  if (prevProps.index !== nextProps.index) return false;
+  // index is only used for display "[n]", no need to trigger re-render
 
   const prev = prevProps.session;
   const next = nextProps.session;

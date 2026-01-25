@@ -47,7 +47,10 @@ export function useSessions(): {
       persistent: true,
       ignoreInitial: true,
       usePolling: false, // Use native inotify on Linux instead of polling
-      // awaitWriteFinish removed - debounce handles write stability
+      awaitWriteFinish: {
+        stabilityThreshold: 100,
+        pollInterval: 50,
+      },
     });
 
     watcher.on('change', debouncedLoadSessions);
