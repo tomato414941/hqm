@@ -45,10 +45,27 @@ Scan the QR code with your phone to access the web interface.
 
 | Command | Description |
 |---------|-------------|
-| `hqm` | Start TUI dashboard |
-| `hqm serve` | Start mobile web server |
+| `hqm` | Start TUI dashboard (runs setup if first time) |
+| `hqm watch` / `hqm w` | Start TUI dashboard |
+| `hqm serve [-p port]` | Start mobile web server only |
+| `hqm list` / `hqm ls` | List all sessions |
+| `hqm clear` | Clear all sessions |
 | `hqm setup` | Register hooks with Claude Code |
-| `hqm hook <event>` | Handle hook events (internal) |
+| `hqm config timeout [min]` | Get/set session timeout (0=disabled) |
+| `hqm config summary` | Manage AI summary (see below) |
+
+### AI Summary
+
+Generate automatic summaries when sessions end using Claude API.
+
+```bash
+hqm config summary setup     # Configure API key
+hqm config summary enable    # Enable summaries
+hqm config summary disable   # Disable summaries
+hqm config summary           # Show current config
+```
+
+Requires an Anthropic API key. Uses `claude-haiku-4-20250514` by default.
 
 ## Requirements
 

@@ -12,12 +12,12 @@ Based on: https://github.com/onikan27/claude-code-monitor It uses Claude Code ho
 
 ```bash
 npm run build          # Compile TypeScript
+npm run dev            # Run TUI in watch mode (tsx)
 npm test               # Run all tests
 npm run test:watch     # Run tests in watch mode
 npm run lint           # Check with Biome
 npm run lint:fix       # Auto-fix lint issues
 npm run typecheck      # Type check without emitting
-npm run dev            # Run TUI in watch mode (tsx)
 ```
 
 Run a single test file:
@@ -54,7 +54,7 @@ The web UI displays `session.lastMessage || session.last_prompt` for each sessio
 - `public/` - Static files for mobile Web UI
 
 ### Session Data
-Sessions are keyed by `{session_id}@{tty}` and stored with: status, cwd, last_prompt, current_tool, notification_type, timestamps.
+Sessions are keyed by `{session_id}@{tty}` and stored in `~/.hqm/sessions.json` with: status, cwd, last_prompt, current_tool, notification_type, lastMessage, summary, timestamps. Config is stored in `~/.hqm/config.json`.
 
 ## Conventions
 
