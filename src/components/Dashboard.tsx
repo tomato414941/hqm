@@ -12,6 +12,24 @@ const QUICK_SELECT_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const MIN_HEIGHT_FOR_QR = 30;
 const MIN_WIDTH_FOR_QR = 80;
 
+const getViewportStart = (
+  selectedIndex: number,
+  totalSessions: number,
+  maxVisible: number
+): number => {
+  if (totalSessions <= maxVisible) return 0;
+
+  // Keep selected item near center
+  const halfVisible = Math.floor(maxVisible / 2);
+  let start = selectedIndex - halfVisible;
+
+  // Clamp to valid range
+  start = Math.max(0, start);
+  start = Math.min(totalSessions - maxVisible, start);
+
+  return start;
+};
+
 interface DashboardProps {
   showQR?: boolean;
   showUrl?: boolean;
@@ -116,6 +134,12 @@ export function Dashboard({
   const sessionHeight = 4; // Each session card (approximate)
   const minHeight = headerHeight + footerHeight + maxSessions * sessionHeight;
 
+  // Calculate visible sessions based on terminal height
+  const availableHeight = terminalHeight - headerHeight - footerHeight;
+  const maxVisibleSessions = Math.max(1, Math.floor(availableHeight / sessionHeight));
+  const viewportStart = getViewportStart(selectedIndex, sessions.length, maxVisibleSessions);
+  const visibleSessions = sessions.slice(viewportStart, viewportStart + maxVisibleSessions);
+
   return (
     <Box flexDirection="row" minHeight={Math.min(minHeight, terminalHeight - 2)}>
       <Box flexDirection="column" flexGrow={1}>
@@ -144,14 +168,23 @@ export function Dashboard({
               <Text dimColor>No active sessions</Text>
             </Box>
           ) : (
-            sessions.map((session, index) => (
-              <SessionCard
-                key={`${session.session_id}:${session.tty || ''}`}
-                session={session}
-                index={index}
-                isSelected={index === selectedIndex}
-              />
-            ))
+            <>
+              {viewportStart > 0 && <Text dimColor> ↑ {viewportStart} more</Text>}
+              {visibleSessions.map((session, i) => {
+                const actualIndex = viewportStart + i;
+                return (
+                  <SessionCard
+                    key={`${session.session_id}:${session.tty || ''}`}
+                    session={session}
+                    index={actualIndex}
+                    isSelected={actualIndex === selectedIndex}
+                  />
+                );
+              })}
+              {viewportStart + maxVisibleSessions < sessions.length && (
+                <Text dimColor> ↓ {sessions.length - viewportStart - maxVisibleSessions} more</Text>
+              )}
+            </>
           )}
         </Box>
 
