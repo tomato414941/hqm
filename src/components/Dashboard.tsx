@@ -1,9 +1,10 @@
-import { Box, Text, useApp, useInput, useStdout } from 'ink';
+import { Box, Text, useApp, useInput } from 'ink';
 import type React from 'react';
 import { useMemo, useState } from 'react';
 import { useServer } from '../hooks/useServer.js';
 import { useSessions } from '../hooks/useSessions.js';
-import { clearSessions } from '../store/file-store.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { clearSessions, removeSession } from '../store/file-store.js';
 import { debugLog } from '../utils/debug.js';
 import { createNewSession, focusSession } from '../utils/focus.js';
 import { SessionCard } from './SessionCard.js';
@@ -43,10 +44,7 @@ export function Dashboard({
   const { qrCode, url, loading: serverLoading } = useServer();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const { exit } = useApp();
-  const { stdout } = useStdout();
-
-  const terminalHeight = stdout?.rows ?? 0;
-  const terminalWidth = stdout?.columns ?? 0;
+  const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
   const showQR =
     showQRProp &&
     showUrlProp &&
@@ -111,6 +109,14 @@ export function Dashboard({
       setSelectedIndex(0);
       return;
     }
+    if (input === 'd') {
+      const session = sessions[selectedIndex];
+      if (session) {
+        removeSession(session.session_id, session.tty);
+        setSelectedIndex(Math.max(0, selectedIndex - 1));
+      }
+      return;
+    }
     if (input === 'n') {
       createNewSession();
       return;
@@ -131,7 +137,7 @@ export function Dashboard({
   const maxSessions = 9;
   const headerHeight = 3; // Header box
   const footerHeight = 2; // Footer help text
-  const sessionHeight = 4; // Each session card (approximate)
+  const sessionHeight = 3; // Each session card (approximate)
   const minHeight = headerHeight + footerHeight + maxSessions * sessionHeight;
 
   // Calculate visible sessions based on terminal height
@@ -193,6 +199,7 @@ export function Dashboard({
           <Text dimColor>[Enter]Focus</Text>
           <Text dimColor>[1-9]Quick</Text>
           <Text dimColor>[n]New</Text>
+          <Text dimColor>[d]Delete</Text>
           <Text dimColor>[c]Clear</Text>
           <Text dimColor>[q]Quit</Text>
         </Box>

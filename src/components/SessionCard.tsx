@@ -58,7 +58,7 @@ export const SessionCard = memo(function SessionCard({
   const shortId = truncateSessionId(session.session_id);
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" minHeight={3}>
       {/* Line 1: Status, time, session ID */}
       <Box paddingX={1}>
         <Text color={isSelected ? 'cyan' : undefined} bold={isSelected}>
