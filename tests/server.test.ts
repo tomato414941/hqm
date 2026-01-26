@@ -40,13 +40,13 @@ vi.mock('../src/utils/send-text.js', () => ({
 
 vi.mock('../src/utils/transcript.js', () => ({
   buildTranscriptPath: vi.fn(),
-  getAllMessages: vi.fn(),
+  getAllMessagesAsync: vi.fn(),
 }));
 
 import { clearSessions, getSessions } from '../src/store/file-store.js';
 import { focusSession } from '../src/utils/focus.js';
 import { sendTextToTerminal } from '../src/utils/send-text.js';
-import { buildTranscriptPath, getAllMessages } from '../src/utils/transcript.js';
+import { buildTranscriptPath, getAllMessagesAsync } from '../src/utils/transcript.js';
 
 const mockNetworkInterfaces = vi.mocked(networkInterfaces);
 const mockGetSessions = vi.mocked(getSessions);
@@ -54,7 +54,7 @@ const mockClearSessions = vi.mocked(clearSessions);
 const mockFocusSession = vi.mocked(focusSession);
 const mockSendTextToTerminal = vi.mocked(sendTextToTerminal);
 const mockBuildTranscriptPath = vi.mocked(buildTranscriptPath);
-const mockGetAllMessages = vi.mocked(getAllMessages);
+const mockGetAllMessagesAsync = vi.mocked(getAllMessagesAsync);
 
 function createMockWebSocket(): WebSocket {
   return {
@@ -443,7 +443,7 @@ describe('server', () => {
         { session_id: 'test-session', tty: '/dev/pts/0', cwd: '/tmp', status: 'active' },
       ]);
       mockBuildTranscriptPath.mockReturnValue('/tmp/.claude/transcript.jsonl');
-      mockGetAllMessages.mockReturnValue({
+      mockGetAllMessagesAsync.mockResolvedValue({
         messages: [{ role: 'user', content: 'hello' }],
         hasMore: false,
       });
@@ -451,7 +451,7 @@ describe('server', () => {
       await handleGetHistoryCommand(ws, 'test-session', 50, 0);
 
       expect(mockBuildTranscriptPath).toHaveBeenCalledWith('/tmp', 'test-session');
-      expect(mockGetAllMessages).toHaveBeenCalledWith('/tmp/.claude/transcript.jsonl', {
+      expect(mockGetAllMessagesAsync).toHaveBeenCalledWith('/tmp/.claude/transcript.jsonl', {
         limit: 50,
         offset: 0,
       });
