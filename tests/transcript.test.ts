@@ -1,21 +1,30 @@
+import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
+  createReadStream: vi.fn(),
 }));
+
+function createMockReadStream(content: string): Readable {
+  return Readable.from(content.split('\n').map((line) => `${line}\n`));
+}
 
 describe('transcript', () => {
   let existsSyncMock: ReturnType<typeof vi.fn>;
   let readFileSyncMock: ReturnType<typeof vi.fn>;
+  let createReadStreamMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     vi.resetModules();
     const fs = await import('node:fs');
     existsSyncMock = fs.existsSync as ReturnType<typeof vi.fn>;
     readFileSyncMock = fs.readFileSync as ReturnType<typeof vi.fn>;
+    createReadStreamMock = fs.createReadStream as ReturnType<typeof vi.fn>;
     existsSyncMock.mockReset();
     readFileSyncMock.mockReset();
+    createReadStreamMock.mockReset();
   });
 
   afterEach(() => {
@@ -422,6 +431,145 @@ describe('transcript', () => {
 
       const { getAllMessages } = await import('../src/utils/transcript.js');
       const result = getAllMessages('/path/to/transcript.jsonl');
+
+      expect(result.messages).toEqual([]);
+      expect(result.hasMore).toBe(false);
+    });
+  });
+
+  describe('getAllMessagesAsync', () => {
+    it('returns empty array when file does not exist', async () => {
+      existsSyncMock.mockReturnValue(false);
+      const { getAllMessagesAsync } = await import('../src/utils/transcript.js');
+
+      const result = await getAllMessagesAsync('/path/to/transcript.jsonl');
+
+      expect(result.messages).toEqual([]);
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('extracts user and assistant messages from JSONL stream', async () => {
+      existsSyncMock.mockReturnValue(true);
+      const content = [
+        JSON.stringify({
+          type: 'user',
+          uuid: 'user-1',
+          timestamp: '2026-01-20T10:00:00Z',
+          message: { role: 'user', content: 'Hello' },
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          uuid: 'assistant-1',
+          timestamp: '2026-01-20T10:00:01Z',
+          message: { content: [{ type: 'text', text: 'Hi there!' }] },
+        }),
+      ].join('\n');
+      createReadStreamMock.mockReturnValue(createMockReadStream(content));
+
+      const { getAllMessagesAsync } = await import('../src/utils/transcript.js');
+      const result = await getAllMessagesAsync('/path/to/transcript.jsonl');
+
+      expect(result.messages).toHaveLength(2);
+      expect(result.messages[0]).toEqual({
+        id: 'user-1',
+        type: 'user',
+        content: 'Hello',
+        timestamp: '2026-01-20T10:00:00Z',
+      });
+      expect(result.messages[1]).toEqual({
+        id: 'assistant-1',
+        type: 'assistant',
+        content: 'Hi there!',
+        timestamp: '2026-01-20T10:00:01Z',
+      });
+    });
+
+    it('skips meta messages and local commands', async () => {
+      existsSyncMock.mockReturnValue(true);
+      const content = [
+        JSON.stringify({
+          type: 'user',
+          uuid: 'meta-1',
+          isMeta: true,
+          message: { content: '<local-command-caveat>...</local-command-caveat>' },
+        }),
+        JSON.stringify({
+          type: 'user',
+          uuid: 'cmd-1',
+          message: { content: '<command-name>/exit</command-name>' },
+        }),
+        JSON.stringify({
+          type: 'user',
+          uuid: 'real-1',
+          message: { content: 'Real user message' },
+        }),
+      ].join('\n');
+      createReadStreamMock.mockReturnValue(createMockReadStream(content));
+
+      const { getAllMessagesAsync } = await import('../src/utils/transcript.js');
+      const result = await getAllMessagesAsync('/path/to/transcript.jsonl');
+
+      expect(result.messages).toHaveLength(1);
+      expect(result.messages[0].content).toBe('Real user message');
+    });
+
+    it('applies pagination with limit and offset', async () => {
+      existsSyncMock.mockReturnValue(true);
+      const messages = Array.from({ length: 10 }, (_, i) =>
+        JSON.stringify({
+          type: 'user',
+          uuid: `msg-${i}`,
+          message: { content: `Message ${i}` },
+        })
+      );
+      createReadStreamMock.mockReturnValue(createMockReadStream(messages.join('\n')));
+
+      const { getAllMessagesAsync } = await import('../src/utils/transcript.js');
+
+      const result1 = await getAllMessagesAsync('/path/to/transcript.jsonl', {
+        limit: 3,
+        offset: 0,
+      });
+      expect(result1.messages).toHaveLength(3);
+      expect(result1.messages[0].content).toBe('Message 7');
+      expect(result1.messages[2].content).toBe('Message 9');
+      expect(result1.hasMore).toBe(true);
+    });
+
+    it('skips invalid JSON lines and continues processing', async () => {
+      existsSyncMock.mockReturnValue(true);
+      const content = [
+        JSON.stringify({
+          type: 'user',
+          uuid: 'valid-1',
+          message: { content: 'Valid message' },
+        }),
+        'invalid json {{{',
+        JSON.stringify({
+          type: 'user',
+          uuid: 'valid-2',
+          message: { content: 'Another valid' },
+        }),
+      ].join('\n');
+      createReadStreamMock.mockReturnValue(createMockReadStream(content));
+
+      const { getAllMessagesAsync } = await import('../src/utils/transcript.js');
+      const result = await getAllMessagesAsync('/path/to/transcript.jsonl');
+
+      expect(result.messages).toHaveLength(2);
+    });
+
+    it('returns empty on stream error', async () => {
+      existsSyncMock.mockReturnValue(true);
+      const errorStream = new Readable({
+        read() {
+          this.destroy(new Error('Stream error'));
+        },
+      });
+      createReadStreamMock.mockReturnValue(errorStream);
+
+      const { getAllMessagesAsync } = await import('../src/utils/transcript.js');
+      const result = await getAllMessagesAsync('/path/to/transcript.jsonl');
 
       expect(result.messages).toEqual([]);
       expect(result.hasMore).toBe(false);
