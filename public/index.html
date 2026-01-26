@@ -290,6 +290,13 @@
       font-style: italic;
     }
 
+    .card-summary {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
     .modal-waiting-notice {
       flex-shrink: 0;
       padding: 16px 20px;
@@ -1338,6 +1345,9 @@
         const shortPath = escapeHtml(formatPath(session.cwd));
         const statusLabel = escapeHtml(STATUS[session.status]);
         const msgPreview = escapeHtml(truncateMessage(session.lastMessage || session.last_prompt));
+        const summaryPreview = session.status === 'stopped' && session.summary
+          ? escapeHtml(truncateMessage(session.summary, 120))
+          : null;
         const safeStatus = escapeHtml(session.status);
 
         return `
@@ -1356,6 +1366,7 @@
                   : `<div class="card-message-empty">No messages yet</div>`
                 }
               </div>
+              ${summaryPreview ? `<div class="card-summary">📝 ${summaryPreview}</div>` : ''}
             </div>
           </div>`;
       }).join('');

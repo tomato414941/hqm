@@ -5,6 +5,7 @@ import type { Session } from '../types/index.js';
 import { abbreviateHomePath } from '../utils/path.js';
 import { truncatePrompt } from '../utils/prompt.js';
 import { getExtendedStatusDisplay } from '../utils/status.js';
+import { truncateText } from '../utils/text.js';
 import { formatRelativeTime } from '../utils/time.js';
 import { Spinner } from './Spinner.js';
 
@@ -16,17 +17,6 @@ interface SessionCardProps {
 
 function truncateSessionId(sessionId: string): string {
   return sessionId.slice(0, 8);
-}
-
-function truncateMessage(message: string, maxLength = 40): string {
-  const normalized = message
-    .replace(/[\r\n]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
-  return `${normalized.slice(0, maxLength - 1)}…`;
 }
 
 // Indentation for lines 2-4 to align with content after "> [n] "
@@ -47,7 +37,8 @@ function arePropsEqual(prevProps: SessionCardProps, nextProps: SessionCardProps)
     prev.last_prompt === next.last_prompt &&
     prev.current_tool === next.current_tool &&
     prev.notification_type === next.notification_type &&
-    prev.lastMessage === next.lastMessage
+    prev.lastMessage === next.lastMessage &&
+    prev.summary === next.summary
   );
 }
 
@@ -60,8 +51,10 @@ export const SessionCard = memo(function SessionCard({
   const dir = abbreviateHomePath(session.cwd);
   const relativeTime = formatRelativeTime(session.updated_at);
   const isRunning = session.status === 'running';
+  const isStopped = session.status === 'stopped';
   const prompt = session.last_prompt ? truncatePrompt(session.last_prompt) : undefined;
-  const lastMessage = session.lastMessage ? truncateMessage(session.lastMessage) : undefined;
+  const lastMessage = session.lastMessage ? truncateText(session.lastMessage, 40) : undefined;
+  const summary = isStopped && session.summary ? truncateText(session.summary, 60) : undefined;
   const shortId = truncateSessionId(session.session_id);
 
   return (
@@ -100,6 +93,14 @@ export const SessionCard = memo(function SessionCard({
           {prompt && <Text dimColor>「{prompt}」</Text>}
           {prompt && lastMessage && <Text dimColor> → </Text>}
           {lastMessage && <Text color="gray">{lastMessage}</Text>}
+        </Box>
+      )}
+      {/* Line 4: Summary (stopped sessions only) */}
+      {summary && (
+        <Box paddingX={1}>
+          <Text>{LINE_INDENT}</Text>
+          <Text color="blue">📝 </Text>
+          <Text color="gray">{summary}</Text>
         </Box>
       )}
     </Box>
