@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import Anthropic from '@anthropic-ai/sdk';
 import { getSummaryConfig, isSummaryEnabled } from '../store/config.js';
+import { type EntryContent, extractTextFromContent } from '../utils/transcript.js';
 
-const DEFAULT_MODEL = 'claude-haiku-4-20250514';
+const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 
 const SUMMARY_PROMPT = `You are summarizing a Claude Code session transcript.
 Provide a brief summary (2-3 sentences max) in the same language as the conversation.
@@ -21,6 +22,13 @@ export interface SummaryResult {
  */
 export { isSummaryEnabled };
 
+interface TranscriptEntry {
+  type: 'user' | 'assistant';
+  message?: {
+    content?: EntryContent;
+  };
+}
+
 /**
  * Read and parse transcript from JSONL file
  */
@@ -32,29 +40,13 @@ function readTranscript(transcriptPath: string): string {
 
     for (const line of lines) {
       try {
-        const entry = JSON.parse(line);
-        if (entry.type === 'user' && entry.message?.content) {
-          const text =
-            typeof entry.message.content === 'string'
-              ? entry.message.content
-              : entry.message.content
-                  .filter((c: { type: string }) => c.type === 'text')
-                  .map((c: { text: string }) => c.text)
-                  .join('\n');
-          if (text.trim()) {
-            messages.push(`User: ${text.trim()}`);
-          }
-        } else if (entry.type === 'assistant' && entry.message?.content) {
-          const text =
-            typeof entry.message.content === 'string'
-              ? entry.message.content
-              : entry.message.content
-                  .filter((c: { type: string }) => c.type === 'text')
-                  .map((c: { text: string }) => c.text)
-                  .join('\n');
-          if (text.trim()) {
-            messages.push(`Assistant: ${text.trim()}`);
-          }
+        const entry = JSON.parse(line) as TranscriptEntry;
+        if (entry.type !== 'user' && entry.type !== 'assistant') continue;
+
+        const text = extractTextFromContent(entry.message?.content);
+        if (text?.trim()) {
+          const role = entry.type === 'user' ? 'User' : 'Assistant';
+          messages.push(`${role}: ${text.trim()}`);
         }
       } catch {
         // Skip invalid JSON lines

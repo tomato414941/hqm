@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { findPaneByTty } from './tmux.js';
 
 /**
  * Validate TTY path format.
@@ -31,74 +32,6 @@ export function isTmuxAvailable(): boolean {
  */
 export function isInsideTmux(): boolean {
   return !!process.env.TMUX;
-}
-
-interface TmuxPane {
-  tty: string;
-  target: string; // session_name:window_index.pane_index
-}
-
-/**
- * List all tmux panes with their TTYs
- * @internal
- */
-function listTmuxPanes(): TmuxPane[] {
-  try {
-    const output = execFileSync(
-      'tmux',
-      ['list-panes', '-a', '-F', '#{pane_tty} #{session_name}:#{window_index}.#{pane_index}'],
-      {
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      }
-    );
-
-    return output
-      .trim()
-      .split('\n')
-      .filter((line) => line.length > 0)
-      .map((line) => {
-        const [tty, target] = line.split(' ');
-        return { tty, target };
-      });
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Get currently attached tmux session names
- * @internal
- */
-function getAttachedSessions(): string[] {
-  try {
-    const output = execFileSync('tmux', ['list-clients', '-F', '#{client_session}'], {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    return output.trim().split('\n').filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Find tmux pane by TTY, prioritizing attached sessions
- * @internal
- */
-function findPaneByTty(tty: string): TmuxPane | undefined {
-  const panes = listTmuxPanes();
-  const attachedSessions = getAttachedSessions();
-
-  // First, look for a pane in an attached session
-  const attachedPane = panes.find(
-    (pane) =>
-      pane.tty === tty && attachedSessions.some((session) => pane.target.startsWith(`${session}:`))
-  );
-  if (attachedPane) return attachedPane;
-
-  // Fall back to the first match (original behavior)
-  return panes.find((pane) => pane.tty === tty);
 }
 
 /**

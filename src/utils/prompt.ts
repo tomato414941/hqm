@@ -1,4 +1,5 @@
 import * as readline from 'node:readline';
+import { truncateText } from './text.js';
 
 /**
  * Ask for user confirmation with Y/n prompt
@@ -81,21 +82,10 @@ export async function askInput(message: string, options?: { mask?: boolean }): P
 
 /**
  * Truncate a prompt string for display in session list
- * Replaces newlines with spaces and truncates to maxLength
  * @param prompt - The prompt to truncate
  * @param maxLength - Maximum length (default: 50)
  * @returns Truncated prompt with ellipsis if needed
  */
-export function truncatePrompt(prompt: string, maxLength: number = 50): string {
-  // Replace newlines and multiple spaces with single space
-  const normalized = prompt
-    .replace(/[\r\n]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, maxLength - 1)}…`;
+export function truncatePrompt(prompt: string, maxLength = 50): string {
+  return truncateText(prompt, maxLength);
 }

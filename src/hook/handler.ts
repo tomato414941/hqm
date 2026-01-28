@@ -53,28 +53,13 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
     process.exit(1);
   }
 
-  // Validate optional fields if present
-  if (hookPayload.cwd !== undefined && typeof hookPayload.cwd !== 'string') {
-    console.error('Invalid cwd: must be a string');
-    process.exit(1);
-  }
-
-  if (
-    hookPayload.notification_type !== undefined &&
-    typeof hookPayload.notification_type !== 'string'
-  ) {
-    console.error('Invalid notification_type: must be a string');
-    process.exit(1);
-  }
-
-  if (hookPayload.prompt !== undefined && typeof hookPayload.prompt !== 'string') {
-    console.error('Invalid prompt: must be a string');
-    process.exit(1);
-  }
-
-  if (hookPayload.tool_name !== undefined && typeof hookPayload.tool_name !== 'string') {
-    console.error('Invalid tool_name: must be a string');
-    process.exit(1);
+  // Validate optional string fields
+  const optionalStringFields = ['cwd', 'notification_type', 'prompt', 'tool_name'];
+  for (const field of optionalStringFields) {
+    if (hookPayload[field] !== undefined && typeof hookPayload[field] !== 'string') {
+      console.error(`Invalid ${field}: must be a string`);
+      process.exit(1);
+    }
   }
 
   const cwd = (hookPayload.cwd as string) || process.cwd();
@@ -86,20 +71,22 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
     notification_type: hookPayload.notification_type as string | undefined,
     prompt: hookPayload.prompt as string | undefined,
     tool_name: hookPayload.tool_name as string | undefined,
-    transcript_path: buildTranscriptPath(cwd, hookPayload.session_id),
   };
 
-  updateSession(event);
+  const session = updateSession(event);
 
   // Generate summary on Stop event if enabled
-  if (eventName === 'Stop' && isSummaryEnabled() && event.transcript_path) {
+  if (eventName === 'Stop' && isSummaryEnabled()) {
     try {
-      const result = await generateSummary(event.transcript_path);
+      const initialCwd = session.initial_cwd ?? session.cwd;
+      const transcriptPath = buildTranscriptPath(initialCwd, session.session_id);
+      const result = await generateSummary(transcriptPath);
       if (result?.summary) {
         updateSessionSummary(event.session_id, event.tty, result.summary);
       }
-    } catch {
+    } catch (err) {
       // Summary generation failure should not block the hook
+      console.error('[hqm] Summary generation failed:', err);
     }
   }
 

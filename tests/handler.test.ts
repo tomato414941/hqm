@@ -207,7 +207,6 @@ describe('handler', () => {
         notification_type: undefined,
         prompt: undefined,
         tool_name: undefined,
-        transcript_path: expect.stringContaining('test-session-123.jsonl'),
       });
       expect(flushPendingWrites).toHaveBeenCalled();
     });

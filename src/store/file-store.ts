@@ -7,8 +7,10 @@ import { getSessionKey, removeOldSessionsOnSameTty } from '../utils/session-key.
 import { determineStatus } from '../utils/session-status.js';
 import { parseISOTimestamp } from '../utils/time.js';
 import { buildTranscriptPath, getLastAssistantMessage } from '../utils/transcript.js';
-import { isTtyAliveAsync } from '../utils/tty-cache.js';
 import { getSessionTimeoutMs } from './config.js';
+import { getFieldUpdates } from './event-handlers.js';
+import { checkSessionsForCleanup } from './session-cleanup.js';
+import { syncTranscripts } from './transcript-sync.js';
 import { getCachedStore, initWriteCache, scheduleWrite } from './write-cache.js';
 
 // Re-export for backward compatibility
@@ -85,64 +87,39 @@ export function updateSession(event: HookEvent): Session {
   const now = new Date().toISOString();
 
   // Remove old session if a different session exists on the same TTY
-  // (e.g., when a new session starts after /clear)
   if (event.tty) {
     removeOldSessionsOnSameTty(store.sessions, event.session_id, event.tty);
   }
 
   const existing = store.sessions[key];
 
-  // Determine new field values based on event type
-  let lastPrompt = existing?.last_prompt;
-  let currentTool = existing?.current_tool;
-  let notificationType = existing?.notification_type;
-
-  switch (event.hook_event_name) {
-    case 'UserPromptSubmit':
-      if (event.prompt) {
-        lastPrompt = event.prompt;
-      }
-      // Clear notification when user submits new prompt
-      notificationType = undefined;
-      break;
-    case 'PreToolUse':
-      if (event.tool_name) {
-        currentTool = event.tool_name;
-      }
-      break;
-    case 'PostToolUse':
-      currentTool = undefined;
-      break;
-    case 'Notification':
-      if (event.notification_type) {
-        notificationType = event.notification_type;
-      }
-      break;
-    case 'Stop':
-      currentTool = undefined;
-      notificationType = undefined;
-      break;
-  }
+  // Get field updates based on event type
+  const updates = getFieldUpdates(event, {
+    last_prompt: existing?.last_prompt,
+    current_tool: existing?.current_tool,
+    notification_type: existing?.notification_type,
+  });
 
   // Get last assistant message from transcript
   let lastMessage = existing?.lastMessage;
-  if (event.transcript_path) {
-    const message = getLastAssistantMessage(event.transcript_path);
-    if (message) {
-      lastMessage = message;
-    }
+  const initialCwd = existing?.initial_cwd ?? event.cwd;
+  const transcriptPath = buildTranscriptPath(initialCwd, event.session_id);
+  const message = getLastAssistantMessage(transcriptPath);
+  if (message) {
+    lastMessage = message;
   }
 
   const session: Session = {
     session_id: event.session_id,
     cwd: event.cwd,
+    initial_cwd: existing?.initial_cwd ?? event.cwd,
     tty: event.tty ?? existing?.tty,
     status: determineStatus(event, existing?.status),
     created_at: existing?.created_at ?? now,
     updated_at: now,
-    last_prompt: lastPrompt,
-    current_tool: currentTool,
-    notification_type: notificationType,
+    last_prompt: updates.lastPrompt,
+    current_tool: updates.currentTool,
+    notification_type: updates.notificationType,
     lastMessage,
   };
 
@@ -155,34 +132,15 @@ export function updateSession(event: HookEvent): Session {
 export async function getSessions(): Promise<Session[]> {
   const span = startPerf('getSessions');
   const store = readStore();
-  const now = Date.now();
   const timeoutMs = getSessionTimeoutMs();
-
-  // 並列で TTY チェックを実行
   const entries = Object.entries(store.sessions);
-  const ttyChecks = await Promise.all(
-    entries.map(async ([key, session]) => {
-      const lastUpdateMs = parseISOTimestamp(session.updated_at);
 
-      // Skip sessions with invalid timestamps (don't delete them)
-      if (lastUpdateMs === null) {
-        return { key, session, shouldRemove: false, reason: null };
-      }
-
-      // Check timeout only if timeoutMs > 0 (0 means no timeout)
-      const isSessionActive = timeoutMs === 0 || now - lastUpdateMs <= timeoutMs;
-      const isTtyStillAlive = await isTtyAliveAsync(session.tty);
-
-      const shouldRemove = !isSessionActive || !isTtyStillAlive;
-      const reason = !isTtyStillAlive ? 'tty_closed' : !isSessionActive ? 'timeout' : null;
-
-      return { key, session, shouldRemove, reason, elapsed: now - lastUpdateMs };
-    })
-  );
+  // Check sessions for cleanup
+  const cleanupResults = await checkSessionsForCleanup(store, timeoutMs);
 
   let hasChanges = false;
   let removedCount = 0;
-  for (const { key, session, shouldRemove, reason, elapsed } of ttyChecks) {
+  for (const { key, session, shouldRemove, reason, elapsed } of cleanupResults) {
     if (shouldRemove) {
       removedCount += 1;
       if (reason === 'tty_closed') {
@@ -199,28 +157,15 @@ export async function getSessions(): Promise<Session[]> {
     writeStore(store);
   }
 
+  // Sort sessions by creation time
   const result = Object.values(store.sessions).sort((a, b) => {
     const aTime = parseISOTimestamp(a.created_at) ?? 0;
     const bTime = parseISOTimestamp(b.created_at) ?? 0;
     return aTime - bTime;
   });
 
-  // Update lastMessage from transcripts for active sessions
-  let transcriptUpdated = false;
-  for (const session of result) {
-    if (session.status !== 'stopped') {
-      const transcriptPath = buildTranscriptPath(session.cwd, session.session_id);
-      const message = getLastAssistantMessage(transcriptPath);
-      if (message && message !== session.lastMessage) {
-        session.lastMessage = message;
-        const key = getSessionKey(session.session_id, session.tty);
-        store.sessions[key] = session;
-        transcriptUpdated = true;
-      }
-    }
-  }
-
-  if (transcriptUpdated) {
+  // Sync lastMessage from transcripts
+  if (syncTranscripts(result, store)) {
     writeStore(store);
   }
 

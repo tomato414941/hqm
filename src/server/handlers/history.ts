@@ -28,7 +28,7 @@ export async function handleGetHistoryCommand(
     return;
   }
 
-  const transcriptPath = buildTranscriptPath(session.cwd, sessionId);
+  const transcriptPath = buildTranscriptPath(session.initial_cwd ?? session.cwd, sessionId);
   const result = await getAllMessagesAsync(transcriptPath, { limit, offset });
 
   const response: HistoryResponse = {

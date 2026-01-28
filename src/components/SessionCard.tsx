@@ -54,12 +54,12 @@ export const SessionCard = memo(function SessionCard({
   const isStopped = session.status === 'stopped';
   const prompt = session.last_prompt ? truncatePrompt(session.last_prompt) : undefined;
   const lastMessage = session.lastMessage ? truncateText(session.lastMessage, 40) : undefined;
-  const summary = isStopped && session.summary ? truncateText(session.summary, 60) : undefined;
+  const summary = isStopped && session.summary ? truncateText(session.summary, 40) : undefined;
   const shortId = truncateSessionId(session.session_id);
 
   return (
     <Box flexDirection="column" minHeight={3}>
-      {/* Line 1: Status, time, session ID */}
+      {/* Line 1: Status, time, ID, path */}
       <Box paddingX={1}>
         <Text color={isSelected ? 'cyan' : undefined} bold={isSelected}>
           {isSelected ? '>' : ' '} [{index + 1}]
@@ -79,13 +79,17 @@ export const SessionCard = memo(function SessionCard({
         </Box>
         <Text> </Text>
         <Text dimColor>{relativeTime.padEnd(8)}</Text>
-        <Text color="gray">#{shortId}</Text>
-      </Box>
-      {/* Line 2: Directory */}
-      <Box paddingX={1}>
-        <Text>{LINE_INDENT}</Text>
+        <Text color="gray">#{shortId} </Text>
         <Text color={isSelected ? 'white' : 'gray'}>{dir}</Text>
       </Box>
+      {/* Line 2: Summary (if stopped and has summary) */}
+      {summary && (
+        <Box paddingX={1}>
+          <Text>{LINE_INDENT}</Text>
+          <Text color="blue">📝 </Text>
+          <Text color="gray">{summary}</Text>
+        </Box>
+      )}
       {/* Line 3: Prompt → Response */}
       {(prompt || lastMessage) && (
         <Box paddingX={1}>
@@ -93,14 +97,6 @@ export const SessionCard = memo(function SessionCard({
           {prompt && <Text dimColor>「{prompt}」</Text>}
           {prompt && lastMessage && <Text dimColor> → </Text>}
           {lastMessage && <Text color="gray">{lastMessage}</Text>}
-        </Box>
-      )}
-      {/* Line 4: Summary (stopped sessions only) */}
-      {summary && (
-        <Box paddingX={1}>
-          <Text>{LINE_INDENT}</Text>
-          <Text color="blue">📝 </Text>
-          <Text color="gray">{summary}</Text>
         </Box>
       )}
     </Box>

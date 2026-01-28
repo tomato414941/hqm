@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { isLinux, isTmuxAvailable, isValidTtyPath } from './focus.js';
+import { findPaneByTtySimple } from './tmux.js';
 
 const MAX_TEXT_LENGTH = 10000;
 
@@ -13,40 +14,6 @@ export function validateTextInput(text: string): { valid: boolean; error?: strin
   }
 
   return { valid: true };
-}
-
-interface TmuxPane {
-  tty: string;
-  target: string;
-}
-
-function listTmuxPanes(): TmuxPane[] {
-  try {
-    const output = execFileSync(
-      'tmux',
-      ['list-panes', '-a', '-F', '#{pane_tty} #{session_name}:#{window_index}.#{pane_index}'],
-      {
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      }
-    );
-
-    return output
-      .trim()
-      .split('\n')
-      .filter((line) => line.length > 0)
-      .map((line) => {
-        const [tty, target] = line.split(' ');
-        return { tty, target };
-      });
-  } catch {
-    return [];
-  }
-}
-
-function findPaneByTty(tty: string): TmuxPane | undefined {
-  const panes = listTmuxPanes();
-  return panes.find((pane) => pane.tty === tty);
 }
 
 function sendKeysToTmux(target: string, keys: string): boolean {
@@ -98,7 +65,7 @@ export function sendTextToTerminal(
     return { success: false, error: validation.error };
   }
 
-  const pane = findPaneByTty(tty);
+  const pane = findPaneByTtySimple(tty);
   if (!pane) {
     return { success: false, error: 'Could not find tmux pane for TTY' };
   }
@@ -168,7 +135,7 @@ export function sendKeystrokeToTerminal(
     return { success: false, error: 'Only Ctrl+C is supported' };
   }
 
-  const pane = findPaneByTty(tty);
+  const pane = findPaneByTtySimple(tty);
   if (!pane) {
     return { success: false, error: 'Could not find tmux pane for TTY' };
   }

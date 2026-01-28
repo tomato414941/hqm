@@ -11,7 +11,6 @@ export interface HookEvent {
   notification_type?: string;
   prompt?: string;
   tool_name?: string;
-  transcript_path?: string;
 }
 
 // Session status
@@ -21,6 +20,7 @@ export type SessionStatus = 'running' | 'waiting_input' | 'stopped';
 export interface Session {
   session_id: string;
   cwd: string;
+  initial_cwd: string;
   tty?: string;
   status: SessionStatus;
   created_at: string;
