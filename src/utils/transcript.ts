@@ -69,12 +69,51 @@ function extractTextContent(entry: TranscriptEntry): string | null {
   return text;
 }
 
+interface MessageCollector {
+  addEntry(entry: TranscriptEntry): void;
+  getResult(options: GetAllMessagesOptions): GetAllMessagesResult;
+}
+
+function createMessageCollector(): MessageCollector {
+  const allMessages: ConversationMessage[] = [];
+
+  return {
+    addEntry(entry: TranscriptEntry): void {
+      if (entry.type !== 'user' && entry.type !== 'assistant') return;
+
+      const text = extractTextContent(entry);
+      if (!text) return;
+
+      allMessages.push({
+        id: entry.uuid || `msg-${allMessages.length}`,
+        type: entry.type,
+        content: text,
+        timestamp: entry.timestamp,
+      });
+    },
+
+    getResult({ limit = 50, offset = 0 }): GetAllMessagesResult {
+      const total = allMessages.length;
+      const startIndex = Math.max(0, total - offset - limit);
+      const endIndex = total - offset;
+      return {
+        messages: allMessages.slice(startIndex, endIndex),
+        hasMore: startIndex > 0,
+      };
+    },
+  };
+}
+
+function logParseErrors(parseErrors: number, transcriptPath: string): void {
+  if (parseErrors > 3) {
+    debugLog(`transcript parse errors: ${parseErrors} total in ${transcriptPath}`);
+  }
+}
+
 export function getAllMessages(
   transcriptPath: string,
   options: GetAllMessagesOptions = {}
 ): GetAllMessagesResult {
-  const { limit = 50, offset = 0 } = options;
-
   if (!existsSync(transcriptPath)) {
     return { messages: [], hasMore: false };
   }
@@ -82,26 +121,13 @@ export function getAllMessages(
   try {
     const fileContent = readFileSync(transcriptPath, 'utf-8');
     const lines = fileContent.trim().split('\n').filter(Boolean);
-
-    const allMessages: ConversationMessage[] = [];
+    const collector = createMessageCollector();
     let parseErrors = 0;
 
     for (const line of lines) {
       try {
         const entry = JSON.parse(line) as TranscriptEntry;
-
-        // Only process user and assistant messages
-        if (entry.type !== 'user' && entry.type !== 'assistant') continue;
-
-        const text = extractTextContent(entry);
-        if (!text) continue;
-
-        allMessages.push({
-          id: entry.uuid || `msg-${allMessages.length}`,
-          type: entry.type,
-          content: text,
-          timestamp: entry.timestamp,
-        });
+        collector.addEntry(entry);
       } catch (e) {
         parseErrors++;
         if (parseErrors <= 3) {
@@ -111,20 +137,9 @@ export function getAllMessages(
         }
       }
     }
-    if (parseErrors > 3) {
-      debugLog(`transcript parse errors: ${parseErrors} total in ${transcriptPath}`);
-    }
+    logParseErrors(parseErrors, transcriptPath);
 
-    // Apply pagination (from the end for newest first)
-    const total = allMessages.length;
-    const startIndex = Math.max(0, total - offset - limit);
-    const endIndex = total - offset;
-    const paginatedMessages = allMessages.slice(startIndex, endIndex);
-
-    return {
-      messages: paginatedMessages,
-      hasMore: startIndex > 0,
-    };
+    return collector.getResult(options);
   } catch {
     return { messages: [], hasMore: false };
   }
@@ -180,15 +195,12 @@ export async function getAllMessagesAsync(
   transcriptPath: string,
   options: GetAllMessagesOptions = {}
 ): Promise<GetAllMessagesResult> {
-  const { limit = 50, offset = 0 } = options;
-
   if (!existsSync(transcriptPath)) {
     return { messages: [], hasMore: false };
   }
 
   try {
-    const allMessages: ConversationMessage[] = [];
-
+    const collector = createMessageCollector();
     const fileStream = createReadStream(transcriptPath, { encoding: 'utf-8' });
     const rl = createInterface({
       input: fileStream,
@@ -201,18 +213,7 @@ export async function getAllMessagesAsync(
 
       try {
         const entry = JSON.parse(line) as TranscriptEntry;
-
-        if (entry.type !== 'user' && entry.type !== 'assistant') continue;
-
-        const text = extractTextContent(entry);
-        if (!text) continue;
-
-        allMessages.push({
-          id: entry.uuid || `msg-${allMessages.length}`,
-          type: entry.type,
-          content: text,
-          timestamp: entry.timestamp,
-        });
+        collector.addEntry(entry);
       } catch (e) {
         parseErrors++;
         if (parseErrors <= 3) {
@@ -222,20 +223,9 @@ export async function getAllMessagesAsync(
         }
       }
     }
-    if (parseErrors > 3) {
-      debugLog(`transcript parse errors: ${parseErrors} total in ${transcriptPath}`);
-    }
+    logParseErrors(parseErrors, transcriptPath);
 
-    // Apply pagination (from the end for newest first)
-    const total = allMessages.length;
-    const startIndex = Math.max(0, total - offset - limit);
-    const endIndex = total - offset;
-    const paginatedMessages = allMessages.slice(startIndex, endIndex);
-
-    return {
-      messages: paginatedMessages,
-      hasMore: startIndex > 0,
-    };
+    return collector.getResult(options);
   } catch {
     return { messages: [], hasMore: false };
   }
