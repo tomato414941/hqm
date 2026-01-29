@@ -202,17 +202,23 @@ export function getStorePath(): string {
 
 /**
  * Update session with summary
+ * Note: Searches by session_id only, ignoring TTY.
+ * This is necessary because TTY may differ between session start and Stop event.
  */
 export function updateSessionSummary(
   sessionId: string,
-  tty: string | undefined,
+  _tty: string | undefined,
   summary: string
 ): void {
   const store = readStore();
-  const key = getSessionKey(sessionId, tty);
-  const session = store.sessions[key];
 
-  if (session) {
+  // Search by session_id only (TTY may differ at Stop event)
+  const entry = Object.entries(store.sessions).find(
+    ([, session]) => session.session_id === sessionId
+  );
+
+  if (entry) {
+    const [key, session] = entry;
     session.summary = summary;
     session.updated_at = new Date().toISOString();
     store.sessions[key] = session;
