@@ -33,3 +33,15 @@ export const HOOK_EVENTS = [
 ] as const;
 
 export type HookEventName = (typeof HOOK_EVENTS)[number];
+
+/** Minimum terminal height to display QR code */
+export const MIN_HEIGHT_FOR_QR = 30;
+
+/** Minimum terminal width to display QR code */
+export const MIN_WIDTH_FOR_QR = 80;
+
+/** Quick select keys for session navigation (1-9) */
+export const QUICK_SELECT_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+/** Height of each session card in rows */
+export const SESSION_CARD_HEIGHT = 3;

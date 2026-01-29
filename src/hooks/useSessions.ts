@@ -25,6 +25,14 @@ export function useSessions(): {
       setSessions(data);
       setError(null);
 
+      // Clean up stale entries from generatingSummaries
+      const activeSessionIds = new Set(data.map((s) => s.session_id));
+      for (const id of generatingSummaries) {
+        if (!activeSessionIds.has(id)) {
+          generatingSummaries.delete(id);
+        }
+      }
+
       // Generate summaries for stopped sessions without summary (in background)
       for (const session of data) {
         if (session.status === 'stopped' && !session.summary) {

@@ -58,6 +58,7 @@ function handleWebSocketMessage(ws: WebSocket, data: Buffer): void {
   try {
     message = JSON.parse(data.toString()) as WebSocketMessage;
   } catch {
+    ws.send(JSON.stringify({ type: 'error', error: 'Invalid JSON message' }));
     return;
   }
 

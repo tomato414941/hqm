@@ -23,6 +23,14 @@ export function createFileWatcher(wss: WebSocketServer): FSWatcher {
       const sessions = await getSessions();
       broadcastToClients(wss, { type: 'sessions', data: sessions });
 
+      // Clean up stale entries from generatingSummaries
+      const activeSessionIds = new Set(sessions.map((s) => s.session_id));
+      for (const id of generatingSummaries) {
+        if (!activeSessionIds.has(id)) {
+          generatingSummaries.delete(id);
+        }
+      }
+
       // Generate summaries for stopped sessions without summary (in background)
       for (const session of sessions) {
         if (session.status === 'stopped' && !session.summary) {

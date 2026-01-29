@@ -1,17 +1,15 @@
 import { Box, Text, useApp, useInput } from 'ink';
 import type React from 'react';
 import { useMemo, useState } from 'react';
+import { QUICK_SELECT_KEYS, SESSION_CARD_HEIGHT } from '../constants.js';
 import { useServer } from '../hooks/useServer.js';
 import { useSessions } from '../hooks/useSessions.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { clearSessions, removeSession } from '../store/file-store.js';
 import { debugLog } from '../utils/debug.js';
 import { createNewSession, focusSession } from '../utils/focus.js';
+import { shouldShowQRCode } from '../utils/qr-display.js';
 import { SessionCard } from './SessionCard.js';
-
-const QUICK_SELECT_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-const MIN_HEIGHT_FOR_QR = 30;
-const MIN_WIDTH_FOR_QR = 80;
 
 const getViewportStart = (
   selectedIndex: number,
@@ -45,12 +43,7 @@ export function Dashboard({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const { exit } = useApp();
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
-  const showQR =
-    showQRProp &&
-    showUrlProp &&
-    terminalHeight >= MIN_HEIGHT_FOR_QR &&
-    terminalWidth >= MIN_WIDTH_FOR_QR &&
-    !!qrCode;
+  const showQR = shouldShowQRCode(showQRProp, showUrlProp, terminalHeight, terminalWidth, qrCode);
   const showUrlText = showUrlProp && !showQR && url && !serverLoading;
 
   const focusSessionByIndex = (index: number) => {
@@ -137,12 +130,11 @@ export function Dashboard({
   const maxSessions = 9;
   const headerHeight = 3; // Header box
   const footerHeight = 2; // Footer help text
-  const sessionHeight = 3; // Each session card (approximate)
-  const minHeight = headerHeight + footerHeight + maxSessions * sessionHeight;
+  const minHeight = headerHeight + footerHeight + maxSessions * SESSION_CARD_HEIGHT;
 
   // Calculate visible sessions based on terminal height
   const availableHeight = terminalHeight - headerHeight - footerHeight;
-  const maxVisibleSessions = Math.max(1, Math.floor(availableHeight / sessionHeight));
+  const maxVisibleSessions = Math.max(1, Math.floor(availableHeight / SESSION_CARD_HEIGHT));
   const viewportStart = getViewportStart(selectedIndex, sessions.length, maxVisibleSessions);
   const visibleSessions = sessions.slice(viewportStart, viewportStart + maxVisibleSessions);
 

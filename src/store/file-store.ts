@@ -58,6 +58,14 @@ function getEmptyStoreData(): StoreData {
   };
 }
 
+function isValidStoreData(data: unknown): data is StoreData {
+  if (typeof data !== 'object' || data === null) return false;
+  const obj = data as Record<string, unknown>;
+  return (
+    typeof obj.sessions === 'object' && obj.sessions !== null && typeof obj.updated_at === 'string'
+  );
+}
+
 export function readStore(): StoreData {
   // Return cached data if available (for batched writes consistency)
   const cached = getCachedStore();
@@ -71,7 +79,11 @@ export function readStore(): StoreData {
   }
   try {
     const content = readFileSync(STORE_FILE, 'utf-8');
-    return JSON.parse(content) as StoreData;
+    const parsed: unknown = JSON.parse(content);
+    if (!isValidStoreData(parsed)) {
+      return getEmptyStoreData();
+    }
+    return parsed;
   } catch {
     return getEmptyStoreData();
   }
