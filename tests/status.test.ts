@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Session } from '../src/types/index.js';
-import { getExtendedStatusDisplay, getStatusDisplay } from '../src/utils/status.js';
+import { getExtendedStatusDisplay, getStatusDisplay } from '../src/utils/status-display.js';
 
 function createSession(overrides: Partial<Session>): Session {
   return {

@@ -1,6 +1,6 @@
 import type { Session, StoreData } from '../types/index.js';
 import { parseISOTimestamp } from '../utils/time.js';
-import { isTtyAliveAsync } from '../utils/tty-cache.js';
+import { isTtyAliveAsync } from '../utils/tty.js';
 
 export interface CleanupResult {
   key: string;

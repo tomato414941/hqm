@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import type { ConversationMessage } from '../types/index.js';
+import { debugLog } from './debug.js';
 
 export function buildTranscriptPath(cwd: string, sessionId: string): string {
   const claudeDir = join(homedir(), '.claude', 'projects');
@@ -83,6 +84,7 @@ export function getAllMessages(
     const lines = fileContent.trim().split('\n').filter(Boolean);
 
     const allMessages: ConversationMessage[] = [];
+    let parseErrors = 0;
 
     for (const line of lines) {
       try {
@@ -100,9 +102,17 @@ export function getAllMessages(
           content: text,
           timestamp: entry.timestamp,
         });
-      } catch {
-        // Skip invalid JSON lines
+      } catch (e) {
+        parseErrors++;
+        if (parseErrors <= 3) {
+          debugLog(
+            `transcript parse error in ${transcriptPath}: ${e instanceof Error ? e.message : 'unknown'}`
+          );
+        }
       }
+    }
+    if (parseErrors > 3) {
+      debugLog(`transcript parse errors: ${parseErrors} total in ${transcriptPath}`);
     }
 
     // Apply pagination (from the end for newest first)
@@ -185,6 +195,7 @@ export async function getAllMessagesAsync(
       crlfDelay: Number.POSITIVE_INFINITY,
     });
 
+    let parseErrors = 0;
     for await (const line of rl) {
       if (!line.trim()) continue;
 
@@ -202,9 +213,17 @@ export async function getAllMessagesAsync(
           content: text,
           timestamp: entry.timestamp,
         });
-      } catch {
-        // Skip invalid JSON lines
+      } catch (e) {
+        parseErrors++;
+        if (parseErrors <= 3) {
+          debugLog(
+            `transcript parse error in ${transcriptPath}: ${e instanceof Error ? e.message : 'unknown'}`
+          );
+        }
       }
+    }
+    if (parseErrors > 3) {
+      debugLog(`transcript parse errors: ${parseErrors} total in ${transcriptPath}`);
     }
 
     // Apply pagination (from the end for newest first)

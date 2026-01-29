@@ -16,7 +16,7 @@ import { getCachedStore, initWriteCache, scheduleWrite } from './write-cache.js'
 // Re-export for backward compatibility
 export { getSessionKey, removeOldSessionsOnSameTty } from '../utils/session-key.js';
 export { determineStatus } from '../utils/session-status.js';
-export { isTtyAliveAsync } from '../utils/tty-cache.js';
+export { isTtyAliveAsync } from '../utils/tty.js';
 export { flushPendingWrites, resetStoreCache } from './write-cache.js';
 
 const STORE_DIR = join(homedir(), '.hqm');

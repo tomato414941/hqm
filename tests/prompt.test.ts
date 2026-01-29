@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { truncatePrompt } from '../src/utils/prompt.js';
+import { truncatePrompt } from '../src/utils/cli-prompt.js';
 
 describe('prompt', () => {
   describe('truncatePrompt', () => {

@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { PACKAGE_NAME } from '../constants.js';
 import { enableSummary, getConfigPath, getSummaryConfig } from '../store/config.js';
-import { askConfirmation, askInput } from '../utils/prompt.js';
+import { askConfirmation, askInput } from '../utils/cli-prompt.js';
 import {
   applyHooksToSettings,
   areAllHooksConfigured,

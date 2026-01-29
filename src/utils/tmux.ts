@@ -87,7 +87,9 @@ export function clearTmuxCache(): void {
 }
 
 /**
- * Find tmux pane by TTY, prioritizing attached sessions
+ * Find tmux pane by TTY, prioritizing attached sessions.
+ * Use this when switching focus - it prefers panes in attached sessions
+ * to avoid switching to detached sessions unexpectedly.
  */
 export function findPaneByTty(tty: string): TmuxPane | undefined {
   const { panes, attachedSessions } = getCachedPanes();
@@ -104,7 +106,9 @@ export function findPaneByTty(tty: string): TmuxPane | undefined {
 }
 
 /**
- * Find tmux pane by TTY (simple version without session priority)
+ * Find tmux pane by TTY (simple version without session priority).
+ * Use this when sending keys/text - session priority doesn't matter
+ * since we're targeting a specific pane directly.
  */
 export function findPaneByTtySimple(tty: string): TmuxPane | undefined {
   const panes = listTmuxPanes();

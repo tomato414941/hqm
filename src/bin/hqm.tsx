@@ -17,7 +17,7 @@ import {
 import { clearSessions, getSessions } from '../store/file-store.js';
 import { debugLog } from '../utils/debug.js';
 import { abbreviateHomePath } from '../utils/path.js';
-import { getStatusDisplay } from '../utils/status.js';
+import { getStatusDisplay } from '../utils/status-display.js';
 import { getTtyFromAncestors } from '../utils/tty.js';
 
 const require = createRequire(import.meta.url);

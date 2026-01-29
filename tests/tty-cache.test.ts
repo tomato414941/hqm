@@ -5,6 +5,9 @@ import { MAX_TTY_CACHE_SIZE, TTY_CACHE_TTL_MS } from '../src/constants.js';
 vi.mock('node:fs', () => ({
   statSync: vi.fn(),
   stat: vi.fn(),
+  readlinkSync: vi.fn(() => {
+    throw new Error('not a tty');
+  }),
 }));
 
 describe('tty-cache', () => {
@@ -23,21 +26,21 @@ describe('tty-cache', () => {
   afterEach(async () => {
     vi.useRealTimers();
     // Clear cache after each test
-    const { clearTtyCache } = await import('../src/utils/tty-cache.js');
+    const { clearTtyCache } = await import('../src/utils/tty.js');
     clearTtyCache();
     vi.resetModules();
   });
 
   describe('isTtyAlive', () => {
     it('returns true for undefined TTY', async () => {
-      const { isTtyAlive } = await import('../src/utils/tty-cache.js');
+      const { isTtyAlive } = await import('../src/utils/tty.js');
       expect(isTtyAlive(undefined)).toBe(true);
       expect(statSyncMock).not.toHaveBeenCalled();
     });
 
     it('returns true for existing TTY', async () => {
       statSyncMock.mockReturnValue({});
-      const { isTtyAlive } = await import('../src/utils/tty-cache.js');
+      const { isTtyAlive } = await import('../src/utils/tty.js');
       expect(isTtyAlive('/dev/pts/0')).toBe(true);
       expect(statSyncMock).toHaveBeenCalledWith('/dev/pts/0');
     });
@@ -46,14 +49,14 @@ describe('tty-cache', () => {
       statSyncMock.mockImplementation(() => {
         throw new Error('ENOENT');
       });
-      const { isTtyAlive } = await import('../src/utils/tty-cache.js');
+      const { isTtyAlive } = await import('../src/utils/tty.js');
       expect(isTtyAlive('/dev/pts/999')).toBe(false);
       expect(statSyncMock).toHaveBeenCalledWith('/dev/pts/999');
     });
 
     it('uses cached result within TTL', async () => {
       statSyncMock.mockReturnValue({});
-      const { isTtyAlive } = await import('../src/utils/tty-cache.js');
+      const { isTtyAlive } = await import('../src/utils/tty.js');
 
       // First call should check the TTY
       expect(isTtyAlive('/dev/pts/1')).toBe(true);
@@ -69,7 +72,7 @@ describe('tty-cache', () => {
 
     it('refreshes cache after TTL expires', async () => {
       statSyncMock.mockReturnValue({});
-      const { isTtyAlive } = await import('../src/utils/tty-cache.js');
+      const { isTtyAlive } = await import('../src/utils/tty.js');
 
       // First call
       expect(isTtyAlive('/dev/pts/2')).toBe(true);
@@ -85,7 +88,7 @@ describe('tty-cache', () => {
 
     it('evicts oldest entries when cache exceeds max size', async () => {
       statSyncMock.mockReturnValue({});
-      const { isTtyAlive } = await import('../src/utils/tty-cache.js');
+      const { isTtyAlive } = await import('../src/utils/tty.js');
 
       // Fill cache to max size
       for (let i = 0; i <= MAX_TTY_CACHE_SIZE; i++) {
@@ -112,7 +115,7 @@ describe('tty-cache', () => {
   describe('clearTtyCache', () => {
     it('clears all cached entries', async () => {
       statSyncMock.mockReturnValue({});
-      const { isTtyAlive, clearTtyCache } = await import('../src/utils/tty-cache.js');
+      const { isTtyAlive, clearTtyCache } = await import('../src/utils/tty.js');
 
       // Add entry to cache
       isTtyAlive('/dev/pts/10');
@@ -133,7 +136,7 @@ describe('tty-cache', () => {
 
   describe('isTtyAliveAsync', () => {
     it('returns true for undefined TTY', async () => {
-      const { isTtyAliveAsync } = await import('../src/utils/tty-cache.js');
+      const { isTtyAliveAsync } = await import('../src/utils/tty.js');
       const result = await isTtyAliveAsync(undefined);
       expect(result).toBe(true);
       expect(statMock).not.toHaveBeenCalled();
@@ -143,7 +146,7 @@ describe('tty-cache', () => {
       statMock.mockImplementation((_path: string, callback: (err: Error | null) => void) => {
         callback(null);
       });
-      const { isTtyAliveAsync } = await import('../src/utils/tty-cache.js');
+      const { isTtyAliveAsync } = await import('../src/utils/tty.js');
 
       const result = await isTtyAliveAsync('/dev/pts/async0');
 
@@ -155,7 +158,7 @@ describe('tty-cache', () => {
       statMock.mockImplementation((_path: string, callback: (err: Error | null) => void) => {
         callback(new Error('ENOENT'));
       });
-      const { isTtyAliveAsync } = await import('../src/utils/tty-cache.js');
+      const { isTtyAliveAsync } = await import('../src/utils/tty.js');
 
       const result = await isTtyAliveAsync('/dev/pts/async999');
 
@@ -167,7 +170,7 @@ describe('tty-cache', () => {
       statMock.mockImplementation((_path: string, callback: (err: Error | null) => void) => {
         callback(null);
       });
-      const { isTtyAliveAsync } = await import('../src/utils/tty-cache.js');
+      const { isTtyAliveAsync } = await import('../src/utils/tty.js');
 
       // First call should check the TTY
       const result1 = await isTtyAliveAsync('/dev/pts/async1');
@@ -187,7 +190,7 @@ describe('tty-cache', () => {
       statMock.mockImplementation((_path: string, callback: (err: Error | null) => void) => {
         callback(null);
       });
-      const { isTtyAliveAsync } = await import('../src/utils/tty-cache.js');
+      const { isTtyAliveAsync } = await import('../src/utils/tty.js');
 
       // First call
       await isTtyAliveAsync('/dev/pts/async2');

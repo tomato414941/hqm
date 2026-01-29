@@ -16,4 +16,4 @@ export type {
 } from './types/index.js';
 export { focusSession, getSupportedTerminals, isLinux } from './utils/focus.js';
 // Utilities
-export { getStatusDisplay } from './utils/status.js';
+export { getStatusDisplay } from './utils/status-display.js';
