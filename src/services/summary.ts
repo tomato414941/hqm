@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs';
 import Anthropic from '@anthropic-ai/sdk';
 import { getSummaryConfig, isSummaryEnabled } from '../store/config.js';
-import { type EntryContent, extractTextFromContent } from '../utils/transcript.js';
+import { updateSessionSummary } from '../store/file-store.js';
+import type { Session } from '../types/index.js';
+import {
+  buildTranscriptPath,
+  type EntryContent,
+  extractTextFromContent,
+} from '../utils/transcript.js';
 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -111,8 +117,37 @@ export async function generateSummary(transcriptPath: string): Promise<SummaryRe
       outputTokens: response.usage.output_tokens,
     };
   } catch (error) {
-    // Log error but don't fail the hook
+    // Log error but don't fail
     console.error('Summary generation failed:', error);
     return null;
   }
+}
+
+/**
+ * Generate summary for a session if not already cached.
+ * Returns the summary (existing or newly generated).
+ */
+export async function generateSessionSummaryIfNeeded(
+  session: Session
+): Promise<string | undefined> {
+  // Return cached summary if available
+  if (session.summary) {
+    return session.summary;
+  }
+
+  if (!isSummaryEnabled()) {
+    return undefined;
+  }
+
+  const initialCwd = session.initial_cwd ?? session.cwd;
+  const transcriptPath = buildTranscriptPath(initialCwd, session.session_id);
+
+  const result = await generateSummary(transcriptPath);
+  if (result?.summary) {
+    // Cache the summary
+    updateSessionSummary(session.session_id, session.tty, result.summary);
+    return result.summary;
+  }
+
+  return undefined;
 }

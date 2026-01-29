@@ -1,8 +1,6 @@
-import { generateSummary, isSummaryEnabled } from '../services/summary.js';
-import { flushPendingWrites, updateSession, updateSessionSummary } from '../store/file-store.js';
+import { flushPendingWrites, updateSession } from '../store/file-store.js';
 import type { HookEvent, HookEventName } from '../types/index.js';
 import { endPerf, startPerf } from '../utils/perf.js';
-import { buildTranscriptPath } from '../utils/transcript.js';
 
 // Allowed hook event names (whitelist)
 /** @internal */
@@ -73,22 +71,7 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
     tool_name: hookPayload.tool_name as string | undefined,
   };
 
-  const session = updateSession(event);
-
-  // Generate summary on UserPromptSubmit or Stop event if enabled
-  if ((eventName === 'UserPromptSubmit' || eventName === 'Stop') && isSummaryEnabled()) {
-    try {
-      const initialCwd = session.initial_cwd ?? session.cwd;
-      const transcriptPath = buildTranscriptPath(initialCwd, session.session_id);
-      const result = await generateSummary(transcriptPath);
-      if (result?.summary) {
-        updateSessionSummary(event.session_id, event.tty, result.summary);
-      }
-    } catch (err) {
-      // Summary generation failure should not block the hook
-      console.error('[hqm] Summary generation failed:', err);
-    }
-  }
+  updateSession(event);
 
   // Ensure data is written before process exits (hooks are short-lived processes)
   await flushPendingWrites();
