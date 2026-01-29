@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import Anthropic from '@anthropic-ai/sdk';
 import { getSummaryConfig, isSummaryEnabled } from '../store/config.js';
 import { updateSessionSummary } from '../store/file-store.js';
@@ -8,6 +8,9 @@ import {
   type EntryContent,
   extractTextFromContent,
 } from '../utils/transcript.js';
+
+// Regenerate summary if transcript grows by this many bytes
+const SUMMARY_REGENERATE_THRESHOLD = 5000; // 5KB
 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -124,30 +127,47 @@ export async function generateSummary(transcriptPath: string): Promise<SummaryRe
 }
 
 /**
- * Generate summary for a session if not already cached.
+ * Get file size in bytes, returns 0 if file doesn't exist
+ */
+function getFileSize(path: string): number {
+  try {
+    return statSync(path).size;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Generate summary for a session if needed.
+ * Regenerates if transcript has grown by more than threshold since last summary.
  * Returns the summary (existing or newly generated).
  */
 export async function generateSessionSummaryIfNeeded(
   session: Session
 ): Promise<string | undefined> {
-  // Return cached summary if available
-  if (session.summary) {
-    return session.summary;
-  }
-
   if (!isSummaryEnabled()) {
-    return undefined;
+    return session.summary;
   }
 
   const initialCwd = session.initial_cwd ?? session.cwd;
   const transcriptPath = buildTranscriptPath(initialCwd, session.session_id);
+  const currentSize = getFileSize(transcriptPath);
+
+  // Check if regeneration is needed
+  const previousSize = session.summary_transcript_size ?? 0;
+  const shouldRegenerate = currentSize - previousSize >= SUMMARY_REGENERATE_THRESHOLD;
+
+  // Return cached summary if no regeneration needed
+  if (session.summary && !shouldRegenerate) {
+    return session.summary;
+  }
 
   const result = await generateSummary(transcriptPath);
   if (result?.summary) {
-    // Cache the summary
-    updateSessionSummary(session.session_id, session.tty, result.summary);
+    // Cache the summary with transcript size
+    updateSessionSummary(session.session_id, session.tty, result.summary, currentSize);
     return result.summary;
   }
 
-  return undefined;
+  return session.summary;
 }

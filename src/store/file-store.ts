@@ -122,6 +122,7 @@ export function updateSession(event: HookEvent): Session {
     notification_type: updates.notificationType,
     lastMessage,
     summary: existing?.summary,
+    summary_transcript_size: existing?.summary_transcript_size,
   };
 
   store.sessions[key] = session;
@@ -209,7 +210,8 @@ export function getStorePath(): string {
 export function updateSessionSummary(
   sessionId: string,
   _tty: string | undefined,
-  summary: string
+  summary: string,
+  transcriptSize?: number
 ): void {
   const store = readStore();
 
@@ -221,6 +223,9 @@ export function updateSessionSummary(
   if (entry) {
     const [key, session] = entry;
     session.summary = summary;
+    if (transcriptSize !== undefined) {
+      session.summary_transcript_size = transcriptSize;
+    }
     session.updated_at = new Date().toISOString();
     store.sessions[key] = session;
     writeStore(store);

@@ -31,6 +31,7 @@ export interface Session {
   notification_type?: string;
   lastMessage?: string;
   summary?: string;
+  summary_transcript_size?: number;
 }
 
 // File store data structure
