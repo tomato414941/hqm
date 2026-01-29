@@ -75,8 +75,8 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
 
   const session = updateSession(event);
 
-  // Generate summary on Stop event if enabled
-  if (eventName === 'Stop' && isSummaryEnabled()) {
+  // Generate summary on UserPromptSubmit or Stop event if enabled
+  if ((eventName === 'UserPromptSubmit' || eventName === 'Stop') && isSummaryEnabled()) {
     try {
       const initialCwd = session.initial_cwd ?? session.cwd;
       const transcriptPath = buildTranscriptPath(initialCwd, session.session_id);
