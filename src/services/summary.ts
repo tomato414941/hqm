@@ -11,10 +11,10 @@ import {
 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 
-const SUMMARY_PROMPT = `You are summarizing a Claude Code session transcript.
-Provide a brief summary (2-3 sentences max) in the same language as the conversation.
-Focus on: what task was being worked on, key accomplishments, and any important outcomes.
-Be concise and factual.`;
+const SUMMARY_PROMPT = `Summarize this Claude Code session in 1-2 sentences.
+Use the same language as the conversation.
+Start directly with the content - no headers, no "This session..." or "In this session..." preamble.
+Example: "Fixed login bug by updating auth middleware. Added unit tests for edge cases."`;
 
 export interface SummaryResult {
   summary: string;
