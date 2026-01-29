@@ -121,6 +121,7 @@ export function updateSession(event: HookEvent): Session {
     current_tool: updates.currentTool,
     notification_type: updates.notificationType,
     lastMessage,
+    summary: existing?.summary,
   };
 
   store.sessions[key] = session;
