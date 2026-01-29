@@ -153,12 +153,14 @@ export async function generateSessionSummaryIfNeeded(
   const transcriptPath = buildTranscriptPath(initialCwd, session.session_id);
   const currentSize = getFileSize(transcriptPath);
 
-  // Check if regeneration is needed
+  // Check if generation is needed:
+  // - First time: always generate if no summary exists
+  // - Regenerate: only if transcript grew by threshold
   const previousSize = session.summary_transcript_size ?? 0;
   const shouldRegenerate = currentSize - previousSize >= SUMMARY_REGENERATE_THRESHOLD;
+  const shouldGenerate = !session.summary || shouldRegenerate;
 
-  // Return cached summary if no regeneration needed
-  if (session.summary && !shouldRegenerate) {
+  if (!shouldGenerate) {
     return session.summary;
   }
 
