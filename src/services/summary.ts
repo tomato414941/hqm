@@ -4,9 +4,9 @@ import { getSummaryConfig, isSummaryEnabled } from '../store/config.js';
 import { updateSessionSummary } from '../store/file-store.js';
 import type { Session } from '../types/index.js';
 import {
-  buildTranscriptPath,
   type EntryContent,
   extractTextFromContent,
+  getTranscriptPath,
 } from '../utils/transcript.js';
 
 // Regenerate summary if transcript grows by this many bytes
@@ -149,8 +149,11 @@ export async function generateSessionSummaryIfNeeded(
     return session.summary;
   }
 
-  const initialCwd = session.initial_cwd ?? session.cwd;
-  const transcriptPath = buildTranscriptPath(initialCwd, session.session_id);
+  const transcriptPath = getTranscriptPath(session.session_id, session.initial_cwd ?? session.cwd);
+  if (!transcriptPath) {
+    return session.summary;
+  }
+
   const currentSize = getFileSize(transcriptPath);
 
   // Check if generation is needed:

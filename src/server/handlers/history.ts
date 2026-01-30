@@ -1,7 +1,7 @@
 import type { WebSocket } from 'ws';
 import { getSessions } from '../../store/file-store.js';
 import type { HistoryResponse, Session } from '../../types/index.js';
-import { buildTranscriptPath, getAllMessagesAsync } from '../../utils/transcript.js';
+import { getAllMessagesAsync, getTranscriptPath } from '../../utils/transcript.js';
 
 async function findSessionById(sessionId: string): Promise<Session | undefined> {
   const sessions = await getSessions();
@@ -28,7 +28,20 @@ export async function handleGetHistoryCommand(
     return;
   }
 
-  const transcriptPath = buildTranscriptPath(session.initial_cwd ?? session.cwd, sessionId);
+  const transcriptPath = getTranscriptPath(sessionId, session.initial_cwd ?? session.cwd);
+  if (!transcriptPath) {
+    ws.send(
+      JSON.stringify({
+        type: 'history',
+        sessionId,
+        messages: [],
+        hasMore: false,
+        error: 'Transcript not found',
+      })
+    );
+    return;
+  }
+
   const result = await getAllMessagesAsync(transcriptPath, { limit, offset });
 
   const response: HistoryResponse = {

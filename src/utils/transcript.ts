@@ -4,11 +4,37 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import type { ConversationMessage } from '../types/index.js';
 import { debugLog } from './debug.js';
+import { getTranscriptPathFromRegistry } from './session-registry.js';
 
+/**
+ * Build transcript path from cwd (legacy method, use getTranscriptPath instead)
+ * @deprecated Use getTranscriptPath() which uses SessionRegistry for accurate paths
+ */
 export function buildTranscriptPath(cwd: string, sessionId: string): string {
   const claudeDir = join(homedir(), '.claude', 'projects');
   const cwdHash = cwd.replace(/\//g, '-');
   return join(claudeDir, cwdHash, `${sessionId}.jsonl`);
+}
+
+/**
+ * Get transcript path for a session, using SessionRegistry with fallback to path building
+ */
+export function getTranscriptPath(sessionId: string, cwd?: string): string | undefined {
+  // Try registry first (most accurate)
+  const registryPath = getTranscriptPathFromRegistry(sessionId);
+  if (registryPath) {
+    return registryPath;
+  }
+
+  // Fallback to building path from cwd if provided
+  if (cwd) {
+    const fallbackPath = buildTranscriptPath(cwd, sessionId);
+    if (existsSync(fallbackPath)) {
+      return fallbackPath;
+    }
+  }
+
+  return undefined;
 }
 
 export type EntryContent = string | Array<{ type: string; text?: string }>;

@@ -6,7 +6,7 @@ import { endPerf, startPerf } from '../utils/perf.js';
 import { getSessionKey, removeOldSessionsOnSameTty } from '../utils/session-key.js';
 import { determineStatus } from '../utils/session-status.js';
 import { parseISOTimestamp } from '../utils/time.js';
-import { buildTranscriptPath, getLastAssistantMessage } from '../utils/transcript.js';
+import { getLastAssistantMessage, getTranscriptPath } from '../utils/transcript.js';
 import { getSessionTimeoutMs } from './config.js';
 import { getFieldUpdates } from './event-handlers.js';
 import { checkSessionsForCleanup } from './session-cleanup.js';
@@ -115,10 +115,12 @@ export function updateSession(event: HookEvent): Session {
   // Get last assistant message from transcript
   let lastMessage = existing?.lastMessage;
   const initialCwd = existing?.initial_cwd ?? event.cwd;
-  const transcriptPath = buildTranscriptPath(initialCwd, event.session_id);
-  const message = getLastAssistantMessage(transcriptPath);
-  if (message) {
-    lastMessage = message;
+  const transcriptPath = getTranscriptPath(event.session_id, initialCwd);
+  if (transcriptPath) {
+    const message = getLastAssistantMessage(transcriptPath);
+    if (message) {
+      lastMessage = message;
+    }
   }
 
   const session: Session = {

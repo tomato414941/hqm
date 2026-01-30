@@ -3,15 +3,21 @@ import type { Session, StoreData } from '../src/types/index.js';
 
 // Mock transcript utilities
 const mockGetLastAssistantMessage = vi.fn();
+const mockGetTranscriptPath = vi.fn();
 vi.mock('../src/utils/transcript.js', () => ({
   buildTranscriptPath: (cwd: string, sessionId: string) =>
     `/tmp/.claude/projects/${cwd}/${sessionId}.jsonl`,
+  getTranscriptPath: (sessionId: string, cwd: string) => mockGetTranscriptPath(sessionId, cwd),
   getLastAssistantMessage: (path: string) => mockGetLastAssistantMessage(path),
 }));
 
 describe('transcript-sync', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mock: return a path based on sessionId and cwd
+    mockGetTranscriptPath.mockImplementation(
+      (sessionId: string, cwd: string) => `/tmp/.claude/projects/${cwd}/${sessionId}.jsonl`
+    );
   });
 
   function createSession(overrides: Partial<Session> = {}): Session {
