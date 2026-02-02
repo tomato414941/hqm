@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import { render } from 'ink';
 import { Dashboard } from '../components/Dashboard.js';
 import { isHooksConfigured, setupHooks } from '../setup/index.js';
-import { clearAction } from './commands/clear.js';
+import { clearAllAction, clearProjectsAction, clearSessionsAction } from './commands/clear.js';
 import { registerConfigCommands } from './commands/config/index.js';
 import { hookAction } from './commands/hook.js';
 import { listAction } from './commands/list.js';
@@ -39,7 +39,22 @@ program
 
 program.command('list').alias('ls').description('List all sessions').action(listAction);
 
-program.command('clear').description('Clear all sessions').action(clearAction);
+const clearCmd = program.command('clear').description('Clear sessions and/or projects');
+clearCmd
+  .command('sessions', { isDefault: true })
+  .description('Clear all sessions (default)')
+  .option('-f, --force', 'Skip confirmation')
+  .action(clearSessionsAction);
+clearCmd
+  .command('projects')
+  .description('Delete all projects (sessions move to ungrouped)')
+  .option('-f, --force', 'Skip confirmation')
+  .action(clearProjectsAction);
+clearCmd
+  .command('all')
+  .description('Clear all sessions and delete all projects')
+  .option('-f, --force', 'Skip confirmation')
+  .action(clearAllAction);
 
 program.command('setup').description('Setup Claude Code hooks for monitoring').action(setupAction);
 

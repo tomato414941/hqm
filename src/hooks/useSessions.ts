@@ -3,18 +3,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { SESSION_REFRESH_INTERVAL_MS, SESSION_UPDATE_DEBOUNCE_MS } from '../constants.js';
 import { generateSessionSummaryIfNeeded } from '../services/summary.js';
 import { getSessionTimeoutMs } from '../store/config.js';
-import { getSessions, getStorePath } from '../store/file-store.js';
-import type { Session } from '../types/index.js';
+import { getProjects, getSessions, getStorePath } from '../store/file-store.js';
+import type { Project, Session } from '../types/index.js';
 
 // Track sessions that are currently generating summaries
 const generatingSummaries = new Set<string>();
 
 export function useSessions(): {
   sessions: Session[];
+  projects: Project[];
   loading: boolean;
   error: Error | null;
 } {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -22,7 +24,9 @@ export function useSessions(): {
   const loadSessions = useCallback(async () => {
     try {
       const data = await getSessions();
+      const projectData = getProjects();
       setSessions(data);
+      setProjects(projectData);
       setError(null);
 
       // Clean up stale entries from generatingSummaries
@@ -106,5 +110,5 @@ export function useSessions(): {
     };
   }, [loadSessions, debouncedLoadSessions]);
 
-  return { sessions, loading, error };
+  return { sessions, projects, loading, error };
 }

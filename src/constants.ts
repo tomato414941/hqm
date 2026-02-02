@@ -45,3 +45,18 @@ export const QUICK_SELECT_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 /** Height of each session card in rows */
 export const SESSION_CARD_HEIGHT = 3;
+
+/** Timeout for pending project assignment in milliseconds (30 seconds) */
+export const PENDING_ASSIGNMENT_TIMEOUT_MS = 30_000;
+
+/** Maximum number of visible sessions in the dashboard */
+export const MAX_VISIBLE_SESSIONS = 9;
+
+/** Threshold in bytes for regenerating session summary */
+export const SUMMARY_REGENERATE_THRESHOLD_BYTES = 5_000;
+
+/** Maximum text length for send-text feature */
+export const MAX_SEND_TEXT_LENGTH = 10_000;
+
+/** Session registry cache TTL in milliseconds (30 seconds) */
+export const SESSION_REGISTRY_CACHE_TTL_MS = 30_000;

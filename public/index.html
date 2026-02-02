@@ -171,6 +171,32 @@
       gap: 16px;
     }
 
+    .project-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .project-header {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+      padding: 8px 12px;
+      background: var(--bg-card);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      letter-spacing: 0.3px;
+    }
+
+    .project-sessions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-left: 12px;
+      border-left: 2px solid var(--border-subtle);
+      margin-left: 8px;
+    }
+
     .card {
       background: var(--bg-card);
       border-radius: var(--radius-md);
@@ -861,9 +887,16 @@
       }
 
       .sessions {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .project-sessions {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
         gap: 20px;
+        padding-left: 16px;
       }
 
       .card:hover {
@@ -992,6 +1025,7 @@
     let targetSession = null;
     let pendingSend = null;
     let sessionsData = [];
+    let projectsData = [];
     let historyMessages = [];
     let historyHasMore = false;
     let historyLoading = false;
@@ -1327,8 +1361,80 @@
     $modalHeader.addEventListener('touchmove', handleSwipeMove, { passive: true });
     $modalHeader.addEventListener('touchend', handleSwipeEnd);
 
-    function render(list) {
+    function getProjectName(projectId) {
+      if (!projectId) return '(ungrouped)';
+      const project = projectsData.find(p => p.id === projectId);
+      return project ? project.name : projectId;
+    }
+
+    function groupByProject(list) {
+      const grouped = new Map();
+      for (const session of list) {
+        const key = session.project || '';
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(session);
+      }
+      const result = [];
+      const ungrouped = grouped.get('');
+      // Named groups first (sorted by project order)
+      const namedKeys = [...grouped.keys()].filter(k => k !== '');
+      namedKeys.sort((a, b) => {
+        const pA = projectsData.find(p => p.id === a);
+        const pB = projectsData.find(p => p.id === b);
+        const orderA = pA?.order ?? Number.MAX_SAFE_INTEGER;
+        const orderB = pB?.order ?? Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) return orderA - orderB;
+        const nameA = pA?.name ?? a;
+        const nameB = pB?.name ?? b;
+        return nameA.localeCompare(nameB);
+      });
+      for (const key of namedKeys) {
+        result.push({ projectId: key, name: getProjectName(key), sessions: grouped.get(key) });
+      }
+      // Ungrouped last
+      if (ungrouped && ungrouped.length > 0) {
+        result.push({ projectId: '', name: '(ungrouped)', sessions: ungrouped });
+      }
+      return result;
+    }
+
+    function renderCard(session) {
+      if (!isValidSessionId(session.session_id)) return '';
+
+      const dirName = escapeHtml(getDirName(session.cwd));
+      const shortPath = escapeHtml(formatPath(session.cwd));
+      const statusLabel = escapeHtml(STATUS[session.status]);
+      const isStopped = session.status === 'stopped';
+      const summaryText = isStopped && session.summary
+        ? escapeHtml(truncateMessage(session.summary, 60))
+        : null;
+      const msgPreview = escapeHtml(truncateMessage(session.lastMessage || session.last_prompt));
+      const safeStatus = escapeHtml(session.status);
+
+      return `
+        <div class="card ${safeStatus}" data-session-id="${escapeHtml(session.session_id)}">
+          <div class="card-status">
+            <span class="card-status-dot"></span>
+            <span>${statusLabel}</span>
+            ${summaryText ? `<span class="card-status-summary">📝 ${summaryText}</span>` : ''}
+            <span class="card-status-chevron">›</span>
+          </div>
+          <div class="card-body">
+            <div class="card-name">${dirName}</div>
+            <div class="card-path">${shortPath}</div>
+            <div class="card-message">
+              ${msgPreview
+                ? `<div class="card-message-text">${msgPreview}</div>`
+                : `<div class="card-message-empty">No messages yet</div>`
+              }
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function render(list, projects) {
       sessionsData = list || [];
+      projectsData = projects || [];
 
       if (targetSession) {
         const session = getSessionById(targetSession);
@@ -1349,39 +1455,15 @@
         return;
       }
 
-      $sessions.innerHTML = list.map(session => {
-        if (!isValidSessionId(session.session_id)) return '';
-
-        const dirName = escapeHtml(getDirName(session.cwd));
-        const shortPath = escapeHtml(formatPath(session.cwd));
-        const statusLabel = escapeHtml(STATUS[session.status]);
-        const isStopped = session.status === 'stopped';
-        const summaryText = isStopped && session.summary
-          ? escapeHtml(truncateMessage(session.summary, 60))
-          : null;
-        const msgPreview = escapeHtml(truncateMessage(session.lastMessage || session.last_prompt));
-        const safeStatus = escapeHtml(session.status);
-
-        return `
-          <div class="card ${safeStatus}" data-session-id="${escapeHtml(session.session_id)}">
-            <div class="card-status">
-              <span class="card-status-dot"></span>
-              <span>${statusLabel}</span>
-              ${summaryText ? `<span class="card-status-summary">📝 ${summaryText}</span>` : ''}
-              <span class="card-status-chevron">›</span>
-            </div>
-            <div class="card-body">
-              <div class="card-name">${dirName}</div>
-              <div class="card-path">${shortPath}</div>
-              <div class="card-message">
-                ${msgPreview
-                  ? `<div class="card-message-text">${msgPreview}</div>`
-                  : `<div class="card-message-empty">No messages yet</div>`
-                }
-              </div>
-            </div>
-          </div>`;
-      }).join('');
+      const groups = groupByProject(list);
+      $sessions.innerHTML = groups.map(group => `
+        <div class="project-group">
+          <div class="project-header">${escapeHtml(group.name)}</div>
+          <div class="project-sessions">
+            ${group.sessions.map(renderCard).join('')}
+          </div>
+        </div>
+      `).join('');
     }
 
     function connect() {
@@ -1419,7 +1501,7 @@
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === 'sessions') {
-            render(msg.data);
+            render(msg.data, msg.projects);
           } else if (msg.type === 'history') {
             handleHistoryResponse(msg);
           } else if (msg.type === 'focusResult') {
