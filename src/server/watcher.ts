@@ -32,9 +32,9 @@ export function createFileWatcher(wss: WebSocketServer): FSWatcher {
         }
       }
 
-      // Generate summaries for stopped sessions without summary (in background)
+      // Generate summaries for sessions that need it (in background)
       for (const session of sessions) {
-        if (session.status === 'stopped' && !session.summary) {
+        if (session.needs_summary) {
           if (generatingSummaries.has(session.session_id)) {
             continue; // Already generating
           }

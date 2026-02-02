@@ -36,7 +36,7 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
   }
 
   // Validate optional string fields
-  const optionalStringFields = ['cwd', 'notification_type', 'prompt', 'tool_name'];
+  const optionalStringFields = ['cwd', 'notification_type', 'prompt', 'tool_name', 'source'];
   for (const field of optionalStringFields) {
     if (hookPayload[field] !== undefined && typeof hookPayload[field] !== 'string') {
       console.error(`Invalid ${field}: must be a string`);
@@ -53,6 +53,7 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
     notification_type: hookPayload.notification_type as string | undefined,
     prompt: hookPayload.prompt as string | undefined,
     tool_name: hookPayload.tool_name as string | undefined,
+    source: hookPayload.source as HookEvent['source'],
   };
 
   updateSession(event);

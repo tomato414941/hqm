@@ -19,6 +19,7 @@ export function isObject(value: unknown): value is Record<string, unknown> {
  * Allowed hook event names (whitelist)
  */
 export const VALID_HOOK_EVENTS: ReadonlySet<string> = new Set<HookEventName>([
+  'SessionStart',
   'PreToolUse',
   'PostToolUse',
   'Notification',

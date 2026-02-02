@@ -25,6 +25,7 @@ export const SESSION_REFRESH_INTERVAL_MS = 60_000;
 
 /** Hook event types supported by Claude Code */
 export const HOOK_EVENTS = [
+  'SessionStart',
   'UserPromptSubmit',
   'PreToolUse',
   'PostToolUse',

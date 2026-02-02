@@ -86,7 +86,7 @@ describe('watcher', () => {
       });
     });
 
-    it('should trigger summary generation for stopped sessions without summary', async () => {
+    it('should trigger summary generation for sessions with needs_summary flag', async () => {
       const { createFileWatcher } = await import('../src/server/watcher.js');
       const mockWss = { clients: new Set() };
 
@@ -98,7 +98,7 @@ describe('watcher', () => {
           status: 'stopped',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          // No summary
+          needs_summary: true,
         },
       ];
       mockGetSessions.mockResolvedValue(sessions);
@@ -114,7 +114,7 @@ describe('watcher', () => {
       expect(mockGenerateSummary).toHaveBeenCalledWith(sessions[0]);
     });
 
-    it('should not generate summary for sessions that already have one', async () => {
+    it('should not generate summary for sessions without needs_summary flag', async () => {
       const { createFileWatcher } = await import('../src/server/watcher.js');
       const mockWss = { clients: new Set() };
 
@@ -127,6 +127,7 @@ describe('watcher', () => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           summary: 'Already has summary',
+          needs_summary: false,
         },
       ];
       mockGetSessions.mockResolvedValue(sessions);

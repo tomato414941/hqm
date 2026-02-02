@@ -16,6 +16,7 @@ vi.mock('../src/store/file-store.js', () => ({
 describe('handler', () => {
   describe('VALID_HOOK_EVENTS', () => {
     it('should contain all expected hook event names', () => {
+      expect(VALID_HOOK_EVENTS.has('SessionStart')).toBe(true);
       expect(VALID_HOOK_EVENTS.has('PreToolUse')).toBe(true);
       expect(VALID_HOOK_EVENTS.has('PostToolUse')).toBe(true);
       expect(VALID_HOOK_EVENTS.has('Notification')).toBe(true);
@@ -23,13 +24,14 @@ describe('handler', () => {
       expect(VALID_HOOK_EVENTS.has('UserPromptSubmit')).toBe(true);
     });
 
-    it('should have exactly 5 valid events', () => {
-      expect(VALID_HOOK_EVENTS.size).toBe(5);
+    it('should have exactly 6 valid events', () => {
+      expect(VALID_HOOK_EVENTS.size).toBe(6);
     });
   });
 
   describe('isValidHookEventName', () => {
     it('should return true for valid event names', () => {
+      expect(isValidHookEventName('SessionStart')).toBe(true);
       expect(isValidHookEventName('PreToolUse')).toBe(true);
       expect(isValidHookEventName('PostToolUse')).toBe(true);
       expect(isValidHookEventName('Notification')).toBe(true);

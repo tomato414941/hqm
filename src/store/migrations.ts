@@ -1,4 +1,5 @@
 import type { DisplayOrderItem, Session, StoreData } from '../types/index.js';
+import { logDisplayOrderChange } from '../utils/display-order-log.js';
 
 export const UNGROUPED_PROJECT_ID = '';
 
@@ -52,6 +53,14 @@ export function migrateToDisplayOrder(store: StoreData): void {
 
   store.displayOrder = order;
 
+  logDisplayOrderChange('migration', {
+    after: order,
+    extra: {
+      ungroupedSessionCount: ungroupedSessions.length,
+      projectCount: sortedProjects.length,
+    },
+  });
+
   // Clean up old project/order fields from sessions
   for (const session of Object.values(sessionsWithOldData)) {
     delete session.project;
@@ -90,6 +99,7 @@ export function migrateSessionKeys(store: StoreData): void {
 
   // Update displayOrder to use new keys
   if (store.displayOrder && keyMapping.size > 0) {
+    const before = [...store.displayOrder];
     const seenKeys = new Set<string>();
     store.displayOrder = store.displayOrder
       .map((item) => {
@@ -109,6 +119,15 @@ export function migrateSessionKeys(store: StoreData): void {
         }
         return true;
       });
+
+    logDisplayOrderChange('migration_keys', {
+      before,
+      after: store.displayOrder,
+      extra: {
+        keyMappingCount: keyMapping.size,
+        duplicatesRemoved: before.length - store.displayOrder.length,
+      },
+    });
   }
 
   store.sessions = newSessions;

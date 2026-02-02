@@ -1,4 +1,5 @@
 import type { DisplayOrderItem, Project, StoreData } from '../types/index.js';
+import { logDisplayOrderChange } from '../utils/display-order-log.js';
 import { UNGROUPED_PROJECT_ID } from './migrations.js';
 
 function generateId(): string {
@@ -12,6 +13,9 @@ export function createProjectInStore(store: StoreData, name: string): Project {
   if (!store.projects) {
     store.projects = {};
   }
+
+  const before = store.displayOrder ? [...store.displayOrder] : undefined;
+
   const id = generateId();
   const project: Project = {
     id,
@@ -34,6 +38,13 @@ export function createProjectInStore(store: StoreData, name: string): Project {
     // No ungrouped found, add to end
     store.displayOrder.push({ type: 'project', id });
   }
+
+  logDisplayOrderChange('create_project', {
+    projectId: id,
+    before,
+    after: store.displayOrder,
+    extra: { projectName: name },
+  });
 
   return project;
 }
@@ -70,6 +81,9 @@ export function getProjectsFromStore(store: StoreData): Project[] {
 export function clearAllProjectsFromStore(store: StoreData): void {
   if (!store.projects || Object.keys(store.projects).length === 0) return;
 
+  const before = store.displayOrder ? [...store.displayOrder] : undefined;
+  const projectIds = Object.keys(store.projects);
+
   // Collect all session items
   const sessionItems: DisplayOrderItem[] = (store.displayOrder || []).filter(
     (item): item is DisplayOrderItem & { type: 'session' } => item.type === 'session'
@@ -78,6 +92,12 @@ export function clearAllProjectsFromStore(store: StoreData): void {
   // Reset projects and displayOrder
   store.projects = {};
   store.displayOrder = [{ type: 'project', id: UNGROUPED_PROJECT_ID }, ...sessionItems];
+
+  logDisplayOrderChange('clear_all_projects', {
+    before,
+    after: store.displayOrder,
+    extra: { deletedProjectIds: projectIds },
+  });
 }
 
 /**
@@ -85,6 +105,8 @@ export function clearAllProjectsFromStore(store: StoreData): void {
  */
 export function deleteProjectFromStore(store: StoreData, id: string): void {
   if (!store.projects?.[id]) return;
+
+  const before = store.displayOrder ? [...store.displayOrder] : undefined;
 
   delete store.projects[id];
 
@@ -119,6 +141,17 @@ export function deleteProjectFromStore(store: StoreData, id: string): void {
         }
         store.displayOrder.splice(insertIndex, 0, ...sessionsToMove);
       }
+
+      logDisplayOrderChange('delete_project', {
+        projectId: id,
+        before,
+        after: store.displayOrder,
+        extra: {
+          sessionsMovedToUngrouped: sessionsToMove.map((s) =>
+            s.type === 'session' ? s.key : s.id
+          ),
+        },
+      });
     }
   }
 }

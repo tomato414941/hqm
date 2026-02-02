@@ -11,6 +11,7 @@ export interface HookEvent {
   notification_type?: string;
   prompt?: string;
   tool_name?: string;
+  source?: 'startup' | 'resume' | 'clear' | 'compact';
 }
 
 // Session status
@@ -32,6 +33,7 @@ export interface Session {
   lastMessage?: string;
   summary?: string;
   summary_transcript_size?: number;
+  needs_summary?: boolean;
 }
 
 // Project for grouping sessions

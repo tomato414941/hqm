@@ -81,6 +81,14 @@ describe('hooks', () => {
   });
 
   describe('createHookEntry', () => {
+    it('should create entry with matcher for SessionStart', () => {
+      const entry = createHookEntry('SessionStart', 'hqm');
+      expect(entry).toEqual({
+        hooks: [{ type: 'command', command: 'hqm hook SessionStart' }],
+        matcher: '',
+      });
+    });
+
     it('should create entry without matcher for UserPromptSubmit', () => {
       const entry = createHookEntry('UserPromptSubmit', 'hqm');
       expect(entry).toEqual({
@@ -128,6 +136,7 @@ describe('hooks', () => {
       const result = categorizeHooks(settings);
 
       expect(result.toAdd).toEqual([
+        'SessionStart',
         'UserPromptSubmit',
         'PreToolUse',
         'PostToolUse',
@@ -141,7 +150,7 @@ describe('hooks', () => {
       const settings: Settings = { hooks: {} };
       const result = categorizeHooks(settings);
 
-      expect(result.toAdd).toHaveLength(5);
+      expect(result.toAdd).toHaveLength(6);
       expect(result.toSkip).toHaveLength(0);
     });
 
@@ -173,6 +182,12 @@ describe('hooks', () => {
     it('should return all events as toSkip when fully configured', () => {
       const settings: Settings = {
         hooks: {
+          SessionStart: [
+            {
+              matcher: '',
+              hooks: [{ type: 'command', command: 'hqm hook SessionStart' }],
+            },
+          ],
           UserPromptSubmit: [
             {
               hooks: [{ type: 'command', command: 'hqm hook UserPromptSubmit' }],
@@ -207,7 +222,7 @@ describe('hooks', () => {
       const result = categorizeHooks(settings);
 
       expect(result.toAdd).toHaveLength(0);
-      expect(result.toSkip).toHaveLength(5);
+      expect(result.toSkip).toHaveLength(6);
     });
   });
 
@@ -306,6 +321,12 @@ describe('hooks', () => {
     it('should return true when all hooks are configured', () => {
       const settings: Settings = {
         hooks: {
+          SessionStart: [
+            {
+              matcher: '',
+              hooks: [{ type: 'command', command: 'hqm hook SessionStart' }],
+            },
+          ],
           UserPromptSubmit: [
             {
               hooks: [{ type: 'command', command: 'hqm hook UserPromptSubmit' }],
@@ -343,6 +364,12 @@ describe('hooks', () => {
     it('should return true when using npx format', () => {
       const settings: Settings = {
         hooks: {
+          SessionStart: [
+            {
+              matcher: '',
+              hooks: [{ type: 'command', command: 'npx hqm hook SessionStart' }],
+            },
+          ],
           UserPromptSubmit: [
             {
               hooks: [{ type: 'command', command: 'npx hqm hook UserPromptSubmit' }],
