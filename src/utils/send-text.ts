@@ -1,16 +1,18 @@
 import { execFileSync } from 'node:child_process';
+import { MAX_SEND_TEXT_LENGTH } from '../constants.js';
 import { isLinux, isTmuxAvailable, isValidTtyPath } from './focus.js';
 import { findPaneByTtySimple } from './tmux.js';
-
-const MAX_TEXT_LENGTH = 10000;
 
 export function validateTextInput(text: string): { valid: boolean; error?: string } {
   if (!text || text.trim().length === 0) {
     return { valid: false, error: 'Text cannot be empty' };
   }
 
-  if (text.length > MAX_TEXT_LENGTH) {
-    return { valid: false, error: `Text exceeds maximum length of ${MAX_TEXT_LENGTH} characters` };
+  if (text.length > MAX_SEND_TEXT_LENGTH) {
+    return {
+      valid: false,
+      error: `Text exceeds maximum length of ${MAX_SEND_TEXT_LENGTH} characters`,
+    };
   }
 
   return { valid: true };

@@ -14,8 +14,10 @@ vi.mock('chokidar', () => ({
 
 // Mock file-store
 const mockGetSessions = vi.fn();
+const mockGetProjects = vi.fn().mockReturnValue([]);
 vi.mock('../src/store/file-store.js', () => ({
   getSessions: () => mockGetSessions(),
+  getProjects: () => mockGetProjects(),
   getStorePath: () => '/tmp/sessions.json',
 }));
 
@@ -80,6 +82,7 @@ describe('watcher', () => {
       expect(mockBroadcast).toHaveBeenCalledWith(mockWss, {
         type: 'sessions',
         data: sessions,
+        projects: [],
       });
     });
 

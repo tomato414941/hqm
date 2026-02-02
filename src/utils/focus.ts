@@ -85,12 +85,12 @@ export function getSupportedTerminals(): string[] {
 
 /**
  * Create a new tmux window and launch Claude Code
- * @returns true if successful
+ * @returns The TTY of the new window, or null if failed
  */
-export function createNewSession(): boolean {
-  if (!isLinux()) return false;
-  if (!isTmuxAvailable()) return false;
-  if (!isInsideTmux()) return false;
+export function createNewSession(): string | null {
+  if (!isLinux()) return null;
+  if (!isTmuxAvailable()) return null;
+  if (!isInsideTmux()) return null;
 
   try {
     const targetSession = process.env.HQM_TMUX_SESSION;
@@ -105,14 +105,20 @@ export function createNewSession(): boolean {
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
 
+    // Get the TTY of the new window
+    const tty = execFileSync('tmux', ['display', '-t', newWindowTarget, '-p', '#{pane_tty}'], {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+
     // 新ウィンドウにフォーカスを移動
     execFileSync('tmux', ['switch-client', '-t', newWindowTarget], {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
-    return true;
+    return tty || null;
   } catch {
-    return false;
+    return null;
   }
 }

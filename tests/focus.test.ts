@@ -54,15 +54,21 @@ describe('focus', () => {
       mockExecFileSync.mockImplementation((cmd, args) => {
         if (cmd === 'which') return '/usr/bin/tmux';
         if (cmd === 'tmux' && args?.[0] === 'new-window') return 'work:1\n';
+        if (cmd === 'tmux' && args?.[0] === 'display') return '/dev/pts/5\n';
         return '';
       });
 
       const result = createNewSession();
 
-      expect(result).toBe(true);
+      expect(result).toBe('/dev/pts/5');
       expect(mockExecFileSync).toHaveBeenCalledWith(
         'tmux',
         ['new-window', '-t', 'work', '-P', '-F', '#{session_name}:#{window_index}', 'claude'],
+        expect.objectContaining({ encoding: 'utf-8' })
+      );
+      expect(mockExecFileSync).toHaveBeenCalledWith(
+        'tmux',
+        ['display', '-t', 'work:1', '-p', '#{pane_tty}'],
         expect.objectContaining({ encoding: 'utf-8' })
       );
       expect(mockExecFileSync).toHaveBeenCalledWith(
@@ -77,15 +83,21 @@ describe('focus', () => {
       mockExecFileSync.mockImplementation((cmd, args) => {
         if (cmd === 'which') return '/usr/bin/tmux';
         if (cmd === 'tmux' && args?.[0] === 'new-window') return 'main:2\n';
+        if (cmd === 'tmux' && args?.[0] === 'display') return '/dev/pts/3\n';
         return '';
       });
 
       const result = createNewSession();
 
-      expect(result).toBe(true);
+      expect(result).toBe('/dev/pts/3');
       expect(mockExecFileSync).toHaveBeenCalledWith(
         'tmux',
         ['new-window', '-P', '-F', '#{session_name}:#{window_index}', 'claude'],
+        expect.objectContaining({ encoding: 'utf-8' })
+      );
+      expect(mockExecFileSync).toHaveBeenCalledWith(
+        'tmux',
+        ['display', '-t', 'main:2', '-p', '#{pane_tty}'],
         expect.objectContaining({ encoding: 'utf-8' })
       );
       expect(mockExecFileSync).toHaveBeenCalledWith(
@@ -95,16 +107,16 @@ describe('focus', () => {
       );
     });
 
-    it('should return false when not inside tmux', () => {
+    it('should return null when not inside tmux', () => {
       delete process.env.TMUX;
       mockExecFileSync.mockReturnValue('/usr/bin/tmux');
 
       const result = createNewSession();
 
-      expect(result).toBe(false);
+      expect(result).toBe(null);
     });
 
-    it('should return false when tmux is not available', () => {
+    it('should return null when tmux is not available', () => {
       mockExecFileSync.mockImplementation((cmd) => {
         if (cmd === 'which') throw new Error('not found');
         return '';
@@ -112,18 +124,18 @@ describe('focus', () => {
 
       const result = createNewSession();
 
-      expect(result).toBe(false);
+      expect(result).toBe(null);
     });
 
-    it('should return false when not on Linux', () => {
+    it('should return null when not on Linux', () => {
       Object.defineProperty(process, 'platform', { value: 'darwin' });
 
       const result = createNewSession();
 
-      expect(result).toBe(false);
+      expect(result).toBe(null);
     });
 
-    it('should return false when tmux command fails', () => {
+    it('should return null when tmux command fails', () => {
       mockExecFileSync.mockImplementation((cmd) => {
         if (cmd === 'which') return '/usr/bin/tmux';
         if (cmd === 'tmux') throw new Error('tmux error');
@@ -132,7 +144,7 @@ describe('focus', () => {
 
       const result = createNewSession();
 
-      expect(result).toBe(false);
+      expect(result).toBe(null);
     });
   });
 

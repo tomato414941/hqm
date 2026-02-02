@@ -1,7 +1,7 @@
 import type { IncomingMessage } from 'node:http';
 import type { WebSocket, WebSocketServer } from 'ws';
-import { getSessions } from '../store/file-store.js';
-import type { Session } from '../types/index.js';
+import { getProjects, getSessions } from '../store/file-store.js';
+import type { Project, Session } from '../types/index.js';
 import { serverLog } from '../utils/debug.js';
 import { handleFocusCommand } from './handlers/focus.js';
 import { handleGetHistoryCommand } from './handlers/history.js';
@@ -21,6 +21,7 @@ interface WebSocketMessage {
 interface BroadcastMessage {
   type: 'sessions';
   data: Session[];
+  projects: Project[];
 }
 
 const WEBSOCKET_OPEN = 1;
@@ -79,7 +80,8 @@ export function broadcastToClients(wss: WebSocketServer, message: BroadcastMessa
 
 async function sendSessionsToClient(ws: WebSocket): Promise<void> {
   const sessions = await getSessions();
-  ws.send(JSON.stringify({ type: 'sessions', data: sessions }));
+  const projects = getProjects();
+  ws.send(JSON.stringify({ type: 'sessions', data: sessions, projects }));
 }
 
 export function setupWebSocketHandlers(wss: WebSocketServer, validToken: string): void {

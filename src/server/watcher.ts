@@ -2,7 +2,7 @@ import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import type { WebSocketServer } from 'ws';
 import { generateSessionSummaryIfNeeded } from '../services/summary.js';
-import { getSessions, getStorePath } from '../store/file-store.js';
+import { getProjects, getSessions, getStorePath } from '../store/file-store.js';
 import { broadcastToClients } from './websocket.js';
 
 // Track sessions that are currently generating summaries
@@ -21,7 +21,8 @@ export function createFileWatcher(wss: WebSocketServer): FSWatcher {
   watcher.on('change', () => {
     void (async () => {
       const sessions = await getSessions();
-      broadcastToClients(wss, { type: 'sessions', data: sessions });
+      const projects = getProjects();
+      broadcastToClients(wss, { type: 'sessions', data: sessions, projects });
 
       // Clean up stale entries from generatingSummaries
       const activeSessionIds = new Set(sessions.map((s) => s.session_id));
@@ -43,7 +44,12 @@ export function createFileWatcher(wss: WebSocketServer): FSWatcher {
               if (summary) {
                 // Re-broadcast with updated summary
                 void getSessions().then((updated) => {
-                  broadcastToClients(wss, { type: 'sessions', data: updated });
+                  const updatedProjects = getProjects();
+                  broadcastToClients(wss, {
+                    type: 'sessions',
+                    data: updated,
+                    projects: updatedProjects,
+                  });
                 });
               }
             })

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock dependencies
 vi.mock('../src/store/file-store.js', () => ({
   getSessions: vi.fn().mockResolvedValue([]),
+  getProjects: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('../src/utils/debug.js', () => ({
@@ -184,10 +185,14 @@ describe('websocket', () => {
       };
       mockWss.clients.add(mockWs2 as never);
 
-      broadcastToClients(mockWss as never, { type: 'sessions', data: [] });
+      broadcastToClients(mockWss as never, { type: 'sessions', data: [], projects: [] });
 
-      expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify({ type: 'sessions', data: [] }));
-      expect(mockWs2.send).toHaveBeenCalledWith(JSON.stringify({ type: 'sessions', data: [] }));
+      expect(mockWs.send).toHaveBeenCalledWith(
+        JSON.stringify({ type: 'sessions', data: [], projects: [] })
+      );
+      expect(mockWs2.send).toHaveBeenCalledWith(
+        JSON.stringify({ type: 'sessions', data: [], projects: [] })
+      );
     });
 
     it('should not send to closed clients', async () => {
@@ -199,7 +204,7 @@ describe('websocket', () => {
       };
       mockWss.clients.add(closedWs as never);
 
-      broadcastToClients(mockWss as never, { type: 'sessions', data: [] });
+      broadcastToClients(mockWss as never, { type: 'sessions', data: [], projects: [] });
 
       expect(mockWs.send).toHaveBeenCalled(); // readyState = 1 (OPEN)
       expect(closedWs.send).not.toHaveBeenCalled();

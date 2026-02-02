@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { SESSION_REGISTRY_CACHE_TTL_MS } from '../constants.js';
 import { debugLog } from './debug.js';
 
 interface SessionIndexEntry {
@@ -20,7 +21,6 @@ const INDEX_FILE = 'sessions-index.json';
 // Cache for sessionId -> fullPath mapping
 let registry: Map<string, string> = new Map();
 let lastRefresh = 0;
-const CACHE_TTL_MS = 30000; // 30 seconds
 
 function parseSessionsIndex(filePath: string): SessionsIndex | null {
   try {
@@ -80,7 +80,7 @@ export function refreshSessionRegistry(): void {
  */
 export function getTranscriptPathFromRegistry(sessionId: string): string | undefined {
   // Auto-refresh if cache is stale
-  if (Date.now() - lastRefresh > CACHE_TTL_MS) {
+  if (Date.now() - lastRefresh > SESSION_REGISTRY_CACHE_TTL_MS) {
     refreshSessionRegistry();
   }
   return registry.get(sessionId);
@@ -98,7 +98,7 @@ export function getTranscriptPathFresh(sessionId: string): string | undefined {
  * Get all session IDs in the registry
  */
 export function getAllSessionIds(): string[] {
-  if (Date.now() - lastRefresh > CACHE_TTL_MS) {
+  if (Date.now() - lastRefresh > SESSION_REGISTRY_CACHE_TTL_MS) {
     refreshSessionRegistry();
   }
   return Array.from(registry.keys());

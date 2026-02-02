@@ -1,5 +1,6 @@
 import { readFileSync, statSync } from 'node:fs';
 import Anthropic from '@anthropic-ai/sdk';
+import { SUMMARY_REGENERATE_THRESHOLD_BYTES } from '../constants.js';
 import { getSummaryConfig, isSummaryEnabled } from '../store/config.js';
 import { updateSessionSummary } from '../store/file-store.js';
 import type { Session } from '../types/index.js';
@@ -8,9 +9,6 @@ import {
   extractTextFromContent,
   getTranscriptPath,
 } from '../utils/transcript.js';
-
-// Regenerate summary if transcript grows by this many bytes
-const SUMMARY_REGENERATE_THRESHOLD = 5000; // 5KB
 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -160,7 +158,7 @@ export async function generateSessionSummaryIfNeeded(
   // - First time: always generate if no summary exists
   // - Regenerate: only if transcript grew by threshold
   const previousSize = session.summary_transcript_size ?? 0;
-  const shouldRegenerate = currentSize - previousSize >= SUMMARY_REGENERATE_THRESHOLD;
+  const shouldRegenerate = currentSize - previousSize >= SUMMARY_REGENERATE_THRESHOLD_BYTES;
   const shouldGenerate = !session.summary || shouldRegenerate;
 
   if (!shouldGenerate) {

@@ -1,26 +1,10 @@
 import { flushPendingWrites, updateSession } from '../store/file-store.js';
-import type { HookEvent, HookEventName } from '../types/index.js';
+import type { HookEvent } from '../types/index.js';
 import { endPerf, startPerf } from '../utils/perf.js';
+import { isNonEmptyString, isValidHookEventName, VALID_HOOK_EVENTS } from '../utils/type-guards.js';
 
-// Allowed hook event names (whitelist)
-/** @internal */
-export const VALID_HOOK_EVENTS: ReadonlySet<string> = new Set<HookEventName>([
-  'PreToolUse',
-  'PostToolUse',
-  'Notification',
-  'Stop',
-  'UserPromptSubmit',
-]);
-
-/** @internal */
-export function isValidHookEventName(name: string): name is HookEventName {
-  return VALID_HOOK_EVENTS.has(name);
-}
-
-/** @internal */
-export function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0;
-}
+// Re-export for backward compatibility
+export { VALID_HOOK_EVENTS, isNonEmptyString, isValidHookEventName };
 
 export async function handleHookEvent(eventName: string, tty?: string): Promise<void> {
   const span = startPerf('handleHookEvent', { hook_event_name: eventName, has_tty: !!tty });
