@@ -2,9 +2,13 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { HookEvent, Session, StoreData } from '../src/types/index.js';
+import type { HookEvent, StoreData } from '../src/types/index.js';
 
 const TEST_STORE_DIR = join(tmpdir(), `hqm-test-${process.pid}`);
+
+// Set of TTYs that are considered "alive" in tests
+// Tests can add/remove TTYs from this set to control isTtyAliveAsync behavior
+const aliveTtys = new Set<string>();
 
 vi.mock('node:os', async (importOriginal) => {
   const original = await importOriginal<typeof import('node:os')>();
@@ -14,17 +18,14 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
-// Mock isTtyAliveAsync to return true for most TTYs, but false for specific test paths
-vi.mock('../src/utils/tty-cache.js', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../src/utils/tty-cache.js')>();
+// Mock isTtyAliveAsync to check against aliveTtys set
+vi.mock('../src/utils/tty.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../src/utils/tty.js')>();
   return {
     ...original,
     isTtyAliveAsync: async (tty: string | undefined) => {
       if (!tty) return true;
-      // Return false for TTYs that are explicitly meant to not exist in tests
-      if (tty === '/dev/pts/999') return false;
-      // All other TTYs are treated as alive (for CI compatibility)
-      return true;
+      return aliveTtys.has(tty);
     },
   };
 });
@@ -37,6 +38,9 @@ vi.mock('../src/store/config.js', () => ({
 
 describe('file-store', () => {
   beforeEach(async () => {
+    // Reset alive TTYs set
+    aliveTtys.clear();
+
     // Reset in-memory cache before each test
     const { resetStoreCache } = await import('../src/store/file-store.js');
     resetStoreCache();
@@ -59,35 +63,13 @@ describe('file-store', () => {
   });
 
   describe('getSessionKey', () => {
-    it('should return session_id:tty when tty is provided', async () => {
-      const { getSessionKey } = await import('../src/store/file-store.js');
-      expect(getSessionKey('abc123', '/dev/pts/1')).toBe('abc123:/dev/pts/1');
-    });
-
-    it('should return session_id only when tty is not provided', async () => {
+    it('should return session_id only', async () => {
       const { getSessionKey } = await import('../src/store/file-store.js');
       expect(getSessionKey('abc123')).toBe('abc123');
-      expect(getSessionKey('abc123', undefined)).toBe('abc123');
     });
   });
 
-  describe('isTtyAliveAsync', () => {
-    it('should return true when tty is undefined', async () => {
-      const { isTtyAliveAsync } = await import('../src/store/file-store.js');
-      expect(await isTtyAliveAsync(undefined)).toBe(true);
-    });
-
-    it('should return false when tty does not exist', async () => {
-      const { isTtyAliveAsync } = await import('../src/store/file-store.js');
-      expect(await isTtyAliveAsync('/dev/pts/999')).toBe(false);
-    });
-
-    it('should return true when tty exists', async () => {
-      const { isTtyAliveAsync } = await import('../src/store/file-store.js');
-      // /dev/null always exists
-      expect(await isTtyAliveAsync('/dev/null')).toBe(true);
-    });
-  });
+  // Note: isTtyAliveAsync is tested in tty-cache.test.ts
 
   describe('determineStatus', () => {
     it('should return stopped on Stop event', async () => {
@@ -155,52 +137,23 @@ describe('file-store', () => {
       };
       expect(determineStatus(event)).toBe('running');
     });
-  });
 
-  describe('removeOldSessionsOnSameTty', () => {
-    it('should remove sessions with same tty but different session_id', async () => {
-      const { removeOldSessionsOnSameTty } = await import('../src/store/file-store.js');
-      const sessions: Record<string, Session> = {
-        'old:/dev/pts/1': {
-          session_id: 'old',
-          cwd: '/tmp',
-          tty: '/dev/pts/1',
-          status: 'running',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        'other:/dev/pts/2': {
-          session_id: 'other',
-          cwd: '/tmp',
-          tty: '/dev/pts/2',
-          status: 'running',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
+    it('should keep existing status on idle_prompt notification', async () => {
+      const { determineStatus } = await import('../src/store/file-store.js');
+      const event: HookEvent = {
+        session_id: 'test',
+        cwd: '/tmp',
+        hook_event_name: 'Notification',
+        notification_type: 'idle_prompt',
       };
-
-      removeOldSessionsOnSameTty(sessions, 'new', '/dev/pts/1');
-
-      expect(sessions['old:/dev/pts/1']).toBeUndefined();
-      expect(sessions['other:/dev/pts/2']).toBeDefined();
-    });
-
-    it('should not remove session with same session_id', async () => {
-      const { removeOldSessionsOnSameTty } = await import('../src/store/file-store.js');
-      const sessions: Record<string, Session> = {
-        'same:/dev/pts/1': {
-          session_id: 'same',
-          cwd: '/tmp',
-          tty: '/dev/pts/1',
-          status: 'running',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      };
-
-      removeOldSessionsOnSameTty(sessions, 'same', '/dev/pts/1');
-
-      expect(sessions['same:/dev/pts/1']).toBeDefined();
+      // Keep stopped status (CCM behavior)
+      expect(determineStatus(event, 'stopped')).toBe('stopped');
+      // Keep running status
+      expect(determineStatus(event, 'running')).toBe('running');
+      // Keep waiting_input status
+      expect(determineStatus(event, 'waiting_input')).toBe('waiting_input');
+      // Default to running when no current status
+      expect(determineStatus(event)).toBe('running');
     });
   });
 
@@ -217,7 +170,7 @@ describe('file-store', () => {
       const { readStore, writeStore } = await import('../src/store/file-store.js');
       const testData: StoreData = {
         sessions: {
-          'test:/dev/pts/1': {
+          test: {
             session_id: 'test',
             cwd: '/tmp',
             tty: '/dev/pts/1',
@@ -232,8 +185,8 @@ describe('file-store', () => {
       writeStore(testData);
       const readData = readStore();
 
-      expect(readData.sessions['test:/dev/pts/1']).toBeDefined();
-      expect(readData.sessions['test:/dev/pts/1'].session_id).toBe('test');
+      expect(readData.sessions.test).toBeDefined();
+      expect(readData.sessions.test.session_id).toBe('test');
     });
 
     it('should return empty store data when file contains invalid JSON', async () => {
@@ -264,7 +217,7 @@ describe('file-store', () => {
       expect(session.tty).toBe('/dev/pts/1');
       expect(session.status).toBe('running');
 
-      const stored = getSession('new-session', '/dev/pts/1');
+      const stored = getSession('new-session');
       expect(stored).toBeDefined();
       expect(stored?.session_id).toBe('new-session');
     });
@@ -287,19 +240,79 @@ describe('file-store', () => {
         notification_type: 'permission_prompt',
       });
 
-      const session = getSession('test', '/dev/pts/1');
+      const session = getSession('test');
       expect(session?.status).toBe('waiting_input');
+    });
+
+    it('should remove stale sessions on the same TTY when new session starts', async () => {
+      const { updateSession, getSession, readStore } = await import('../src/store/file-store.js');
+
+      // Create first session on /dev/pts/10
+      updateSession({
+        session_id: 'old-session',
+        cwd: '/tmp/old',
+        tty: '/dev/pts/10',
+        hook_event_name: 'PreToolUse',
+      });
+
+      expect(getSession('old-session')).toBeDefined();
+
+      // Create new session on the same TTY
+      updateSession({
+        session_id: 'new-session',
+        cwd: '/tmp/new',
+        tty: '/dev/pts/10',
+        hook_event_name: 'PreToolUse',
+      });
+
+      // Old session should be removed
+      expect(getSession('old-session')).toBeUndefined();
+      // New session should exist
+      expect(getSession('new-session')).toBeDefined();
+
+      // Verify in store
+      const store = readStore();
+      expect(Object.keys(store.sessions)).toHaveLength(1);
+      expect(store.sessions['new-session']).toBeDefined();
+    });
+
+    it('should not remove sessions on different TTYs', async () => {
+      const { updateSession, getSession } = await import('../src/store/file-store.js');
+
+      // Create first session on /dev/pts/10
+      updateSession({
+        session_id: 'session-1',
+        cwd: '/tmp/1',
+        tty: '/dev/pts/10',
+        hook_event_name: 'PreToolUse',
+      });
+
+      // Create second session on different TTY
+      updateSession({
+        session_id: 'session-2',
+        cwd: '/tmp/2',
+        tty: '/dev/pts/11',
+        hook_event_name: 'PreToolUse',
+      });
+
+      // Both sessions should exist
+      expect(getSession('session-1')).toBeDefined();
+      expect(getSession('session-2')).toBeDefined();
     });
   });
 
   describe('getSessions', () => {
-    it('should return sessions sorted by created_at asc', async () => {
+    it('should return sessions sorted by displayOrder, falling back to created_at', async () => {
       const { writeStore, getSessions } = await import('../src/store/file-store.js');
       const now = Date.now();
 
+      // Add TTYs to alive set
+      aliveTtys.add('/dev/pts/1');
+      aliveTtys.add('/dev/pts/2');
+
       writeStore({
         sessions: {
-          'old:/dev/pts/1': {
+          old: {
             session_id: 'old',
             cwd: '/tmp',
             tty: '/dev/pts/1',
@@ -307,7 +320,7 @@ describe('file-store', () => {
             created_at: new Date(now - 1000).toISOString(),
             updated_at: new Date(now).toISOString(),
           },
-          'new:/dev/pts/2': {
+          new: {
             session_id: 'new',
             cwd: '/tmp',
             tty: '/dev/pts/2',
@@ -331,9 +344,13 @@ describe('file-store', () => {
       const now = Date.now();
       const thirtyOneMinutesAgo = now - 31 * 60 * 1000;
 
+      // Add TTYs to alive set
+      aliveTtys.add('/dev/pts/1');
+      aliveTtys.add('/dev/pts/2');
+
       writeStore({
         sessions: {
-          'expired:/dev/pts/1': {
+          expired: {
             session_id: 'expired',
             cwd: '/tmp',
             tty: '/dev/pts/1',
@@ -341,7 +358,7 @@ describe('file-store', () => {
             created_at: new Date(thirtyOneMinutesAgo).toISOString(),
             updated_at: new Date(thirtyOneMinutesAgo).toISOString(),
           },
-          'active:/dev/pts/2': {
+          active: {
             session_id: 'active',
             cwd: '/tmp',
             tty: '/dev/pts/2',
@@ -358,6 +375,41 @@ describe('file-store', () => {
       expect(sessions).toHaveLength(1);
       expect(sessions[0].session_id).toBe('active');
     });
+
+    it('should remove sessions with closed TTY', async () => {
+      const { writeStore, getSessions } = await import('../src/store/file-store.js');
+      const now = Date.now();
+
+      // Only /dev/pts/2 is alive
+      aliveTtys.add('/dev/pts/2');
+
+      writeStore({
+        sessions: {
+          closedTty: {
+            session_id: 'closedTty',
+            cwd: '/tmp',
+            tty: '/dev/pts/1', // TTY closed (not in aliveTtys)
+            status: 'running',
+            created_at: new Date(now).toISOString(),
+            updated_at: new Date(now).toISOString(),
+          },
+          aliveTty: {
+            session_id: 'aliveTty',
+            cwd: '/tmp',
+            tty: '/dev/pts/2', // TTY alive
+            status: 'running',
+            created_at: new Date(now).toISOString(),
+            updated_at: new Date(now).toISOString(),
+          },
+        },
+        updated_at: new Date().toISOString(),
+      });
+
+      const sessions = await getSessions();
+
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].session_id).toBe('aliveTty');
+    });
   });
 
   describe('removeSession', () => {
@@ -373,11 +425,11 @@ describe('file-store', () => {
         hook_event_name: 'PreToolUse',
       });
 
-      expect(getSession('test', '/dev/pts/1')).toBeDefined();
+      expect(getSession('test')).toBeDefined();
 
-      removeSession('test', '/dev/pts/1');
+      removeSession('test');
 
-      expect(getSession('test', '/dev/pts/1')).toBeUndefined();
+      expect(getSession('test')).toBeUndefined();
     });
   });
 
@@ -413,6 +465,351 @@ describe('file-store', () => {
 
       expect(path).toContain('sessions.json');
       expect(path).toContain('.hqm');
+    });
+  });
+
+  describe('project management', () => {
+    describe('createProject', () => {
+      it('should create a new project', async () => {
+        const { createProject, getProjects } = await import('../src/store/file-store.js');
+
+        const project = createProject('My Project');
+
+        expect(project.id).toBeDefined();
+        expect(project.name).toBe('My Project');
+        expect(project.created_at).toBeDefined();
+
+        const projects = getProjects();
+        expect(projects).toHaveLength(1);
+        expect(projects[0].name).toBe('My Project');
+      });
+
+      it('should add project to displayOrder', async () => {
+        const { createProject, getDisplayOrder } = await import('../src/store/file-store.js');
+
+        const project = createProject('Test Project');
+        const displayOrder = getDisplayOrder();
+
+        const projectItem = displayOrder.find(
+          (item) => item.type === 'project' && item.id === project.id
+        );
+        expect(projectItem).toBeDefined();
+      });
+    });
+
+    describe('getProjects', () => {
+      it('should return empty array when no projects exist', async () => {
+        const { getProjects } = await import('../src/store/file-store.js');
+        const projects = getProjects();
+
+        expect(projects).toEqual([]);
+      });
+
+      it('should return projects sorted by displayOrder', async () => {
+        const { createProject, getProjects } = await import('../src/store/file-store.js');
+
+        createProject('Project A');
+        createProject('Project B');
+
+        const projects = getProjects();
+        expect(projects).toHaveLength(2);
+      });
+    });
+
+    describe('deleteProject', () => {
+      it('should delete a project', async () => {
+        const { createProject, deleteProject, getProjects } = await import(
+          '../src/store/file-store.js'
+        );
+
+        const project = createProject('To Delete');
+        expect(getProjects()).toHaveLength(1);
+
+        deleteProject(project.id);
+
+        expect(getProjects()).toHaveLength(0);
+      });
+
+      it('should move sessions to ungrouped when project is deleted', async () => {
+        const { createProject, deleteProject, updateSession, getDisplayOrder } = await import(
+          '../src/store/file-store.js'
+        );
+
+        const project = createProject('Test Project');
+        const event = {
+          session_id: 'test-session',
+          cwd: '/tmp',
+          hook_event_name: 'PreToolUse' as const,
+        };
+        updateSession(event);
+
+        const { assignSessionToProjectInOrder } = await import('../src/store/file-store.js');
+        assignSessionToProjectInOrder('test-session', project.id);
+
+        deleteProject(project.id);
+
+        const displayOrder = getDisplayOrder();
+        const sessionItem = displayOrder.find(
+          (item) => item.type === 'session' && item.key === 'test-session'
+        );
+        expect(sessionItem).toBeDefined();
+      });
+    });
+  });
+
+  describe('displayOrder management', () => {
+    describe('getDisplayOrder', () => {
+      it('should return default displayOrder with ungrouped project', async () => {
+        const { getDisplayOrder } = await import('../src/store/file-store.js');
+        const displayOrder = getDisplayOrder();
+
+        expect(displayOrder).toHaveLength(1);
+        expect(displayOrder[0]).toEqual({ type: 'project', id: '' });
+      });
+    });
+
+    describe('moveInDisplayOrder', () => {
+      it('should swap adjacent sessions in displayOrder', async () => {
+        const {
+          writeStore,
+          moveInDisplayOrder,
+          getDisplayOrder,
+          flushPendingWrites,
+          resetStoreCache,
+        } = await import('../src/store/file-store.js');
+
+        // Set up store with known displayOrder directly
+        writeStore({
+          sessions: {
+            session1: {
+              session_id: 'session1',
+              cwd: '/tmp',
+              initial_cwd: '/tmp',
+              status: 'running',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            session2: {
+              session_id: 'session2',
+              cwd: '/tmp',
+              initial_cwd: '/tmp',
+              status: 'running',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          },
+          displayOrder: [
+            { type: 'project', id: '' },
+            { type: 'session', key: 'session1' },
+            { type: 'session', key: 'session2' },
+          ],
+          updated_at: new Date().toISOString(),
+        });
+        await flushPendingWrites();
+        resetStoreCache();
+
+        // Move session1 down should swap with session2
+        const result = moveInDisplayOrder('session1', 'down');
+        expect(result).toBe(true);
+
+        await flushPendingWrites();
+        resetStoreCache();
+
+        const displayOrder = getDisplayOrder();
+        const sessionItems = displayOrder.filter((item) => item.type === 'session');
+        expect(sessionItems).toHaveLength(2);
+        expect(sessionItems[0]).toEqual({ type: 'session', key: 'session2' });
+        expect(sessionItems[1]).toEqual({ type: 'session', key: 'session1' });
+      });
+
+      it('should not move session before first project', async () => {
+        const { updateSession, moveInDisplayOrder, flushPendingWrites } = await import(
+          '../src/store/file-store.js'
+        );
+
+        updateSession({
+          session_id: 'session1',
+          cwd: '/tmp',
+          hook_event_name: 'PreToolUse',
+        });
+        await flushPendingWrites();
+
+        const result = moveInDisplayOrder('session1', 'up');
+        expect(result).toBe(false);
+      });
+
+      it('should return false for non-existent session', async () => {
+        const { moveInDisplayOrder } = await import('../src/store/file-store.js');
+
+        const result = moveInDisplayOrder('non-existent', 'up');
+        expect(result).toBe(false);
+      });
+    });
+
+    describe('assignSessionToProjectInOrder', () => {
+      it('should assign session to a project', async () => {
+        const {
+          updateSession,
+          createProject,
+          assignSessionToProjectInOrder,
+          getSessionProject,
+          flushPendingWrites,
+        } = await import('../src/store/file-store.js');
+
+        updateSession({
+          session_id: 'test-session',
+          cwd: '/tmp',
+          hook_event_name: 'PreToolUse',
+        });
+        const project = createProject('Test Project');
+        await flushPendingWrites();
+
+        assignSessionToProjectInOrder('test-session', project.id);
+
+        const projectId = getSessionProject('test-session');
+        expect(projectId).toBe(project.id);
+      });
+
+      it('should move session to ungrouped when assigned to undefined', async () => {
+        const {
+          updateSession,
+          createProject,
+          assignSessionToProjectInOrder,
+          getSessionProject,
+          flushPendingWrites,
+        } = await import('../src/store/file-store.js');
+
+        updateSession({
+          session_id: 'test-session',
+          cwd: '/tmp',
+          hook_event_name: 'PreToolUse',
+        });
+        const project = createProject('Test Project');
+        await flushPendingWrites();
+
+        assignSessionToProjectInOrder('test-session', project.id);
+        assignSessionToProjectInOrder('test-session', undefined);
+
+        const projectId = getSessionProject('test-session');
+        expect(projectId).toBeUndefined();
+      });
+    });
+
+    describe('getSessionProject', () => {
+      it('should return undefined for session in ungrouped', async () => {
+        const { updateSession, getSessionProject, flushPendingWrites } = await import(
+          '../src/store/file-store.js'
+        );
+
+        updateSession({
+          session_id: 'test-session',
+          cwd: '/tmp',
+          hook_event_name: 'PreToolUse',
+        });
+        await flushPendingWrites();
+
+        const projectId = getSessionProject('test-session');
+        expect(projectId).toBeUndefined();
+      });
+
+      it('should return undefined for non-existent session', async () => {
+        const { getSessionProject } = await import('../src/store/file-store.js');
+
+        const projectId = getSessionProject('non-existent');
+        expect(projectId).toBeUndefined();
+      });
+    });
+
+    describe('cleanupDisplayOrder', () => {
+      it('should remove entries for non-existent sessions', async () => {
+        const { writeStore, cleanupDisplayOrder, getDisplayOrder, flushPendingWrites } =
+          await import('../src/store/file-store.js');
+
+        writeStore({
+          sessions: {},
+          displayOrder: [
+            { type: 'project', id: '' },
+            { type: 'session', key: 'non-existent' },
+          ],
+          updated_at: new Date().toISOString(),
+        });
+        await flushPendingWrites();
+
+        const result = cleanupDisplayOrder();
+        expect(result).toBe(true);
+
+        const displayOrder = getDisplayOrder();
+        const sessionItems = displayOrder.filter((item) => item.type === 'session');
+        expect(sessionItems).toHaveLength(0);
+      });
+
+      it('should return false when nothing to cleanup', async () => {
+        const { cleanupDisplayOrder } = await import('../src/store/file-store.js');
+
+        const result = cleanupDisplayOrder();
+        expect(result).toBe(false);
+      });
+    });
+
+    describe('reorderProject', () => {
+      it('should reorder project up', async () => {
+        const { createProject, reorderProject, getProjects } = await import(
+          '../src/store/file-store.js'
+        );
+
+        createProject('Project A');
+        createProject('Project B');
+
+        const projectB = getProjects()[1];
+        reorderProject(projectB.id, 'up');
+
+        const projects = getProjects();
+        expect(projects[0].name).toBe('Project B');
+        expect(projects[1].name).toBe('Project A');
+      });
+
+      it('should do nothing for non-existent project', async () => {
+        const { reorderProject, getProjects, createProject } = await import(
+          '../src/store/file-store.js'
+        );
+
+        createProject('Project A');
+        const initialProjects = getProjects();
+
+        reorderProject('non-existent', 'up');
+
+        const afterProjects = getProjects();
+        expect(afterProjects).toEqual(initialProjects);
+      });
+    });
+  });
+
+  describe('updateSessionSummary', () => {
+    it('should update session summary', async () => {
+      const { updateSession, updateSessionSummary, getSession, flushPendingWrites } = await import(
+        '../src/store/file-store.js'
+      );
+
+      updateSession({
+        session_id: 'test-session',
+        cwd: '/tmp',
+        hook_event_name: 'PreToolUse',
+      });
+      await flushPendingWrites();
+
+      updateSessionSummary('test-session', undefined, 'This is a summary', 1000);
+
+      const session = getSession('test-session');
+      expect(session?.summary).toBe('This is a summary');
+      expect(session?.summary_transcript_size).toBe(1000);
+    });
+
+    it('should do nothing for non-existent session', async () => {
+      const { updateSessionSummary, getSession } = await import('../src/store/file-store.js');
+
+      updateSessionSummary('non-existent', undefined, 'Summary', 1000);
+
+      expect(getSession('non-existent')).toBeUndefined();
     });
   });
 });

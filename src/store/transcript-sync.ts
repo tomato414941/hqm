@@ -1,5 +1,4 @@
 import type { Session, StoreData } from '../types/index.js';
-import { getSessionKey } from '../utils/session-key.js';
 import { getLastAssistantMessage, getTranscriptPath } from '../utils/transcript.js';
 
 /**
@@ -22,8 +21,7 @@ export function syncTranscripts(sessions: Session[], store: StoreData): boolean 
 
     if (message && message !== session.lastMessage) {
       session.lastMessage = message;
-      const key = getSessionKey(session.session_id, session.tty);
-      store.sessions[key] = session;
+      store.sessions[session.session_id] = session;
       updated = true;
     }
   }

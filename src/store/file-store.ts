@@ -1,27 +1,43 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { HookEvent, Session, StoreData } from '../types/index.js';
-import { endPerf, startPerf } from '../utils/perf.js';
-import { getSessionKey, removeOldSessionsOnSameTty } from '../utils/session-key.js';
-import { determineStatus } from '../utils/session-status.js';
-import { parseISOTimestamp } from '../utils/time.js';
-import { getLastAssistantMessage, getTranscriptPath } from '../utils/transcript.js';
-import { getSessionTimeoutMs } from './config.js';
-import { getFieldUpdates } from './event-handlers.js';
-import { checkSessionsForCleanup } from './session-cleanup.js';
-import { syncTranscripts } from './transcript-sync.js';
+import type { DisplayOrderItem, HookEvent, Project, Session, StoreData } from '../types/index.js';
+import { isValidStoreData } from '../utils/type-guards.js';
+import {
+  assignSessionToProject,
+  cleanupStoreDisplayOrder,
+  getDisplayOrderFromStore,
+  getSessionProjectFromStore,
+  moveSessionInDisplayOrder,
+  reorderProjectInStore,
+  UNGROUPED_PROJECT_ID,
+} from './display-order.js';
+import { migrateSessionKeys, migrateToDisplayOrder } from './migrations.js';
+import {
+  clearAllProjectsFromStore,
+  createProjectInStore,
+  deleteProjectFromStore,
+  getProjectsFromStore,
+} from './project-store.js';
+import {
+  clearSessionsFromStore,
+  getSessionFromStore,
+  getSessionsFromStore,
+  removeSessionFromStore,
+  updateSessionInStore,
+  updateSessionSummaryInStore,
+} from './session-store.js';
 import { getCachedStore, initWriteCache, scheduleWrite } from './write-cache.js';
 
 // Re-export for backward compatibility
-export { getSessionKey, removeOldSessionsOnSameTty } from '../utils/session-key.js';
+export { getSessionKey } from '../utils/session-key.js';
 export { determineStatus } from '../utils/session-status.js';
 export { isTtyAliveAsync } from '../utils/tty.js';
+export { UNGROUPED_PROJECT_ID } from './display-order.js';
 export { flushPendingWrites, resetStoreCache } from './write-cache.js';
 
 const STORE_DIR = join(homedir(), '.hqm');
 const STORE_FILE = join(STORE_DIR, 'sessions.json');
-const LOG_FILE = join(STORE_DIR, 'deletion.log');
 
 // Initialize write cache with store paths
 initWriteCache(STORE_DIR, STORE_FILE);
@@ -32,38 +48,12 @@ function ensureStoreDir(): void {
   }
 }
 
-function logDeletion(
-  session: Session,
-  reason: 'timeout' | 'tty_closed',
-  details: Record<string, unknown>
-): void {
-  ensureStoreDir();
-  const logEntry = {
-    timestamp: new Date().toISOString(),
-    session_id: session.session_id,
-    cwd: session.cwd,
-    tty: session.tty,
-    reason,
-    details,
-    last_updated: session.updated_at,
-  };
-  const logLine = `${JSON.stringify(logEntry)}\n`;
-  appendFileSync(LOG_FILE, logLine);
-}
-
 function getEmptyStoreData(): StoreData {
   return {
     sessions: {},
+    displayOrder: [{ type: 'project', id: UNGROUPED_PROJECT_ID }],
     updated_at: new Date().toISOString(),
   };
-}
-
-function isValidStoreData(data: unknown): data is StoreData {
-  if (typeof data !== 'object' || data === null) return false;
-  const obj = data as Record<string, unknown>;
-  return (
-    typeof obj.sessions === 'object' && obj.sessions !== null && typeof obj.updated_at === 'string'
-  );
 }
 
 export function readStore(): StoreData {
@@ -83,6 +73,10 @@ export function readStore(): StoreData {
     if (!isValidStoreData(parsed)) {
       return getEmptyStoreData();
     }
+    // Migrate old data structure if needed
+    migrateToDisplayOrder(parsed);
+    // Migrate session keys from session_id:tty to session_id only
+    migrateSessionKeys(parsed);
     return parsed;
   } catch {
     return getEmptyStoreData();
@@ -93,134 +87,32 @@ export function writeStore(data: StoreData): void {
   scheduleWrite(data);
 }
 
+// Session operations
 export function updateSession(event: HookEvent): Session {
   const store = readStore();
-  const key = getSessionKey(event.session_id, event.tty);
-  const now = new Date().toISOString();
-
-  // Remove old session if a different session exists on the same TTY
-  if (event.tty) {
-    removeOldSessionsOnSameTty(store.sessions, event.session_id, event.tty);
-  }
-
-  const existing = store.sessions[key];
-
-  // Get field updates based on event type
-  const updates = getFieldUpdates(event, {
-    last_prompt: existing?.last_prompt,
-    current_tool: existing?.current_tool,
-    notification_type: existing?.notification_type,
-  });
-
-  // Get last assistant message from transcript
-  let lastMessage = existing?.lastMessage;
-  const initialCwd = existing?.initial_cwd ?? event.cwd;
-  const transcriptPath = getTranscriptPath(event.session_id, initialCwd);
-  if (transcriptPath) {
-    const message = getLastAssistantMessage(transcriptPath);
-    if (message) {
-      lastMessage = message;
-    }
-  }
-
-  const session: Session = {
-    session_id: event.session_id,
-    cwd: event.cwd,
-    initial_cwd: existing?.initial_cwd ?? event.cwd,
-    tty: event.tty ?? existing?.tty,
-    status: determineStatus(event, existing?.status),
-    created_at: existing?.created_at ?? now,
-    updated_at: now,
-    last_prompt: updates.lastPrompt,
-    current_tool: updates.currentTool,
-    notification_type: updates.notificationType,
-    lastMessage,
-    summary: existing?.summary,
-    summary_transcript_size: existing?.summary_transcript_size,
-  };
-
-  store.sessions[key] = session;
-  writeStore(store);
-
-  return session;
+  return updateSessionInStore(store, event, writeStore);
 }
 
 export async function getSessions(): Promise<Session[]> {
-  const span = startPerf('getSessions');
   const store = readStore();
-  const timeoutMs = getSessionTimeoutMs();
-  const entries = Object.entries(store.sessions);
-
-  // Check sessions for cleanup
-  const cleanupResults = await checkSessionsForCleanup(store, timeoutMs);
-
-  let hasChanges = false;
-  let removedCount = 0;
-  for (const { key, session, shouldRemove, reason, elapsed } of cleanupResults) {
-    if (shouldRemove) {
-      removedCount += 1;
-      if (reason === 'tty_closed') {
-        logDeletion(session, 'tty_closed', { tty: session.tty });
-      } else if (reason === 'timeout') {
-        logDeletion(session, 'timeout', { elapsed });
-      }
-      delete store.sessions[key];
-      hasChanges = true;
-    }
-  }
-
-  if (hasChanges) {
-    writeStore(store);
-  }
-
-  // Sort sessions by creation time
-  const result = Object.values(store.sessions).sort((a, b) => {
-    const aTime = parseISOTimestamp(a.created_at) ?? 0;
-    const bTime = parseISOTimestamp(b.created_at) ?? 0;
-    return aTime - bTime;
-  });
-
-  // Sync lastMessage from transcripts
-  if (syncTranscripts(result, store)) {
-    writeStore(store);
-  }
-
-  endPerf(span, {
-    session_count: entries.length,
-    removed_count: removedCount,
-    remaining_count: result.length,
-    timeout_ms: timeoutMs,
-    tty_checks: entries.length,
-  });
-  return result;
+  return getSessionsFromStore(store, writeStore);
 }
 
-export function getSession(sessionId: string, tty?: string): Session | undefined {
+export function getSession(sessionId: string): Session | undefined {
   const store = readStore();
-  const key = getSessionKey(sessionId, tty);
-  return store.sessions[key];
+  return getSessionFromStore(store, sessionId);
 }
 
-export function removeSession(sessionId: string, tty?: string): void {
+export function removeSession(sessionId: string): void {
   const store = readStore();
-  const key = getSessionKey(sessionId, tty);
-  delete store.sessions[key];
-  writeStore(store);
+  removeSessionFromStore(store, sessionId, writeStore);
 }
 
 export function clearSessions(): void {
-  writeStore(getEmptyStoreData());
+  const store = readStore();
+  clearSessionsFromStore(store, writeStore);
 }
 
-export function getStorePath(): string {
-  return STORE_FILE;
-}
-
-/**
- * Update session with summary
- * Note: Searches by session_id only, ignoring TTY.
- * This is necessary because TTY may differ between session start and Stop event.
- */
 export function updateSessionSummary(
   sessionId: string,
   _tty: string | undefined,
@@ -228,20 +120,85 @@ export function updateSessionSummary(
   transcriptSize?: number
 ): void {
   const store = readStore();
+  updateSessionSummaryInStore(store, sessionId, summary, transcriptSize, writeStore);
+}
 
-  // Search by session_id only (TTY may differ at Stop event)
-  const entry = Object.entries(store.sessions).find(
-    ([, session]) => session.session_id === sessionId
-  );
+// Project operations
+export function createProject(name: string): Project {
+  const store = readStore();
+  const project = createProjectInStore(store, name);
+  writeStore(store);
+  return project;
+}
 
-  if (entry) {
-    const [key, session] = entry;
-    session.summary = summary;
-    if (transcriptSize !== undefined) {
-      session.summary_transcript_size = transcriptSize;
-    }
-    session.updated_at = new Date().toISOString();
-    store.sessions[key] = session;
+export function getProjects(): Project[] {
+  const store = readStore();
+  return getProjectsFromStore(store);
+}
+
+export function deleteProject(id: string): void {
+  const store = readStore();
+  deleteProjectFromStore(store, id);
+  writeStore(store);
+}
+
+export function clearProjects(): void {
+  const store = readStore();
+  clearAllProjectsFromStore(store);
+  writeStore(store);
+}
+
+export function clearAll(): void {
+  const store = readStore();
+  clearSessionsFromStore(store, writeStore);
+  clearAllProjectsFromStore(store);
+  writeStore(store);
+}
+
+// DisplayOrder operations
+export function getDisplayOrder(): DisplayOrderItem[] {
+  const store = readStore();
+  return getDisplayOrderFromStore(store);
+}
+
+export function getSessionProject(sessionKey: string): string | undefined {
+  const store = readStore();
+  return getSessionProjectFromStore(store, sessionKey);
+}
+
+export function moveInDisplayOrder(sessionKey: string, direction: 'up' | 'down'): boolean {
+  const store = readStore();
+  const result = moveSessionInDisplayOrder(store, sessionKey, direction);
+  if (result) {
     writeStore(store);
   }
+  return result;
+}
+
+export function assignSessionToProjectInOrder(
+  sessionKey: string,
+  projectId: string | undefined
+): void {
+  const store = readStore();
+  assignSessionToProject(store, sessionKey, projectId);
+  writeStore(store);
+}
+
+export function cleanupDisplayOrder(): boolean {
+  const store = readStore();
+  const result = cleanupStoreDisplayOrder(store);
+  if (result) {
+    writeStore(store);
+  }
+  return result;
+}
+
+export function reorderProject(projectId: string, direction: 'up' | 'down'): void {
+  const store = readStore();
+  reorderProjectInStore(store, projectId, direction);
+  writeStore(store);
+}
+
+export function getStorePath(): string {
+  return STORE_FILE;
 }

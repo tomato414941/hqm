@@ -34,9 +34,22 @@ export interface Session {
   summary_transcript_size?: number;
 }
 
+// Project for grouping sessions
+export interface Project {
+  id: string;
+  name: string;
+  created_at: string;
+  order?: number;
+}
+
+// Display order item (project or session)
+export type DisplayOrderItem = { type: 'project'; id: string } | { type: 'session'; key: string };
+
 // File store data structure
 export interface StoreData {
   sessions: Record<string, Session>;
+  projects?: Record<string, Project>;
+  displayOrder?: DisplayOrderItem[];
   updated_at: string;
 }
 

@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { ensureDir, readJsonFile, writeJsonFile } from '../utils/file-io.js';
 
 const CONFIG_DIR = join(homedir(), '.hqm');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
@@ -38,48 +38,21 @@ const DEFAULT_CONFIG: HqmConfig = {
 };
 
 /**
- * Ensure the config directory exists
- */
-function ensureConfigDir(): void {
-  if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
-  }
-}
-
-/**
  * Read configuration from file
  * Returns default config if file doesn't exist or is invalid
  */
 export function readConfig(): HqmConfig {
-  ensureConfigDir();
-
-  if (!existsSync(CONFIG_FILE)) {
-    return { ...DEFAULT_CONFIG };
-  }
-
-  try {
-    const content = readFileSync(CONFIG_FILE, 'utf-8');
-    const parsed = JSON.parse(content) as Partial<HqmConfig>;
-
-    // Merge with defaults to handle missing fields
-    return {
-      ...DEFAULT_CONFIG,
-      ...parsed,
-    };
-  } catch {
-    return { ...DEFAULT_CONFIG };
-  }
+  ensureDir(CONFIG_DIR);
+  const parsed = readJsonFile<Partial<HqmConfig>>(CONFIG_FILE, {});
+  return { ...DEFAULT_CONFIG, ...parsed };
 }
 
 /**
  * Write configuration to file
  */
 export function writeConfig(config: HqmConfig): void {
-  ensureConfigDir();
-  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), {
-    encoding: 'utf-8',
-    mode: 0o600,
-  });
+  ensureDir(CONFIG_DIR);
+  writeJsonFile(CONFIG_FILE, config);
 }
 
 /**
