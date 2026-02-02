@@ -31,6 +31,13 @@ export function determineStatus(event: HookEvent, currentStatus?: SessionStatus)
     return 'waiting_input';
   }
 
+  // idle_prompt: keep existing status (same behavior as CCM)
+  const isIdlePrompt =
+    event.hook_event_name === 'Notification' && event.notification_type === 'idle_prompt';
+  if (isIdlePrompt) {
+    return currentStatus ?? 'running';
+  }
+
   // Default: running for other events (PostToolUse, etc.)
   return 'running';
 }
