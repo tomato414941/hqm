@@ -51,6 +51,7 @@ function ensureStoreDir(): void {
 function getEmptyStoreData(): StoreData {
   return {
     sessions: {},
+    projects: {},
     displayOrder: [{ type: 'project', id: UNGROUPED_PROJECT_ID }],
     updated_at: new Date().toISOString(),
   };

@@ -13,6 +13,7 @@ interface SessionCardProps {
   session: Session;
   index: number;
   isSelected: boolean;
+  terminalColumns: number;
 }
 
 function truncateSessionId(sessionId: string): string {
@@ -24,6 +25,7 @@ const LINE_INDENT = '      ';
 
 function arePropsEqual(prevProps: SessionCardProps, nextProps: SessionCardProps): boolean {
   if (prevProps.isSelected !== nextProps.isSelected) return false;
+  if (prevProps.terminalColumns !== nextProps.terminalColumns) return false;
   // index is only used for display "[n]", no need to trigger re-render
 
   const prev = prevProps.session;
@@ -42,13 +44,19 @@ function arePropsEqual(prevProps: SessionCardProps, nextProps: SessionCardProps)
   );
 }
 
+// Fixed elements width: "> [n] " (6) + status (18) + time (9) + "#shortId " (10) + padding (2) = 45
+const FIXED_ELEMENTS_WIDTH = 45;
+const MIN_DIR_LENGTH = 20;
+
 export const SessionCard = memo(function SessionCard({
   session,
   index,
   isSelected,
+  terminalColumns,
 }: SessionCardProps): React.ReactElement {
   const { symbol, color, label } = getExtendedStatusDisplay(session);
-  const dir = abbreviateHomePath(session.cwd);
+  const maxDirLength = Math.max(MIN_DIR_LENGTH, terminalColumns - FIXED_ELEMENTS_WIDTH);
+  const dir = truncateText(abbreviateHomePath(session.cwd), maxDirLength);
   const relativeTime = formatRelativeTime(session.updated_at);
   const isRunning = session.status === 'running';
   const isStopped = session.status === 'stopped';

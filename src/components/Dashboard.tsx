@@ -56,6 +56,7 @@ interface DisplayOrderRendererProps {
   maxVisibleSessions: number;
   selectedIndex: number;
   displayOrder: Session[];
+  terminalColumns: number;
 }
 
 function DisplayOrderRenderer({
@@ -66,6 +67,7 @@ function DisplayOrderRenderer({
   maxVisibleSessions,
   selectedIndex,
   displayOrder,
+  terminalColumns,
 }: DisplayOrderRendererProps): React.ReactElement {
   const elements: React.ReactElement[] = [];
   let sessionNumber = 0;
@@ -133,6 +135,7 @@ function DisplayOrderRenderer({
               session={session}
               index={sessionIdx}
               isSelected={sessionIdx === selectedIndex}
+              terminalColumns={terminalColumns}
             />
           </Box>
         );
@@ -238,7 +241,7 @@ export function Dashboard({
   const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>('normal');
   const [projectName, setProjectName] = useState('');
-  const [selectedProjectIndex, setSelectedProjectIndex] = useState(0);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedAssignIndex, setSelectedAssignIndex] = useState(0);
   const [pendingAssignment, setPendingAssignment] = useState<PendingAssignment | null>(null);
   const pendingAssignmentRef = useRef<PendingAssignment | null>(null);
@@ -329,6 +332,13 @@ export function Dashboard({
     return idx >= 0 ? idx : 0;
   }, [displayOrder, selectedSessionKey]);
 
+  // Derive selectedProjectIndex from selectedProjectId
+  const selectedProjectIndex = useMemo(() => {
+    if (!selectedProjectId) return 0;
+    const idx = projects.findIndex((p) => p.id === selectedProjectId);
+    return idx >= 0 ? idx : 0;
+  }, [projects, selectedProjectId]);
+
   // Callbacks that depend on displayOrder must be defined after it
   const focusSessionByIndex = useCallback(
     (index: number) => {
@@ -349,29 +359,29 @@ export function Dashboard({
   }, [projectName]);
 
   const handleDeleteProject = useCallback(() => {
-    if (projects.length > 0 && selectedProjectIndex < projects.length) {
-      const project = projects[selectedProjectIndex];
-      deleteProject(project.id);
-      // Adjust selection if needed
-      if (selectedProjectIndex >= projects.length - 1 && selectedProjectIndex > 0) {
-        setSelectedProjectIndex(selectedProjectIndex - 1);
-      }
+    if (!selectedProjectId) return;
+    const projectIndex = projects.findIndex((p) => p.id === selectedProjectId);
+    if (projectIndex === -1) return;
+
+    deleteProject(selectedProjectId);
+
+    // Select the previous project if we deleted the last one
+    if (projectIndex >= projects.length - 1 && projectIndex > 0) {
+      const prevProject = projects[projectIndex - 1];
+      if (prevProject) setSelectedProjectId(prevProject.id);
+    } else if (projects.length === 1) {
+      setSelectedProjectId(null);
     }
-  }, [projects, selectedProjectIndex]);
+    // Otherwise useMemo will update index automatically
+  }, [projects, selectedProjectId]);
 
   const handleReorderProject = useCallback(
     (direction: 'up' | 'down') => {
-      if (projects.length > 0 && selectedProjectIndex < projects.length) {
-        const project = projects[selectedProjectIndex];
-        reorderProject(project.id, direction);
-        // Move selection with the project
-        const newIndex = direction === 'up' ? selectedProjectIndex - 1 : selectedProjectIndex + 1;
-        if (newIndex >= 0 && newIndex < projects.length) {
-          setSelectedProjectIndex(newIndex);
-        }
-      }
+      if (!selectedProjectId) return;
+      reorderProject(selectedProjectId, direction);
+      // selectedProjectId stays the same, useMemo auto-updates index
     },
-    [projects, selectedProjectIndex]
+    [selectedProjectId]
   );
 
   const handleAssignProject = useCallback(
@@ -464,11 +474,15 @@ export function Dashboard({
         return;
       }
       if (key.upArrow) {
-        setSelectedProjectIndex((prev) => Math.max(0, prev - 1));
+        const newIndex = Math.max(0, selectedProjectIndex - 1);
+        const project = projects[newIndex];
+        if (project) setSelectedProjectId(project.id);
         return;
       }
       if (key.downArrow) {
-        setSelectedProjectIndex((prev) => Math.min(projects.length - 1, prev + 1));
+        const newIndex = Math.min(projects.length - 1, selectedProjectIndex + 1);
+        const project = projects[newIndex];
+        if (project) setSelectedProjectId(project.id);
         return;
       }
       if (input === 'k') {
@@ -517,7 +531,7 @@ export function Dashboard({
         } else if (inputMode === 'confirmClearProjects') {
           clearProjects();
           setInputMode('manageProjects');
-          setSelectedProjectIndex(0);
+          setSelectedProjectId(null);
         } else if (inputMode === 'confirmDeleteProject') {
           handleDeleteProject();
           setInputMode('manageProjects');
@@ -634,7 +648,9 @@ export function Dashboard({
     }
     if (input === 'p') {
       setInputMode('manageProjects');
-      setSelectedProjectIndex(0);
+      // Select first project if available
+      const firstProject = projects[0];
+      setSelectedProjectId(firstProject?.id ?? null);
       return;
     }
     if (input === 'a') {
@@ -759,6 +775,7 @@ export function Dashboard({
               maxVisibleSessions={maxVisibleSessions}
               selectedIndex={selectedIndex}
               displayOrder={displayOrder}
+              terminalColumns={terminalWidth}
             />
           )}
         </Box>
