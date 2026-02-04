@@ -45,8 +45,10 @@ function arePropsEqual(prevProps: SessionCardProps, nextProps: SessionCardProps)
 }
 
 // Fixed elements width: "> [n] " (6) + status (18) + time (9) + "#shortId " (10) + padding (2) = 45
-const FIXED_ELEMENTS_WIDTH = 45;
-const MIN_DIR_LENGTH = 20;
+const LINE1_FIXED_WIDTH = 45;
+// Line 2/3 indent: "      " (6) + paddingX (2) = 8
+const LINE_INDENT_WIDTH = 8;
+const MIN_CONTENT_LENGTH = 20;
 
 export const SessionCard = memo(function SessionCard({
   session,
@@ -55,15 +57,38 @@ export const SessionCard = memo(function SessionCard({
   terminalColumns,
 }: SessionCardProps): React.ReactElement {
   const { symbol, color, label } = getExtendedStatusDisplay(session);
-  const maxDirLength = Math.max(MIN_DIR_LENGTH, terminalColumns - FIXED_ELEMENTS_WIDTH);
+  const maxDirLength = Math.max(MIN_CONTENT_LENGTH, terminalColumns - LINE1_FIXED_WIDTH);
+  const maxLineLength = Math.max(MIN_CONTENT_LENGTH, terminalColumns - LINE_INDENT_WIDTH);
   const dir = truncateText(abbreviateHomePath(session.cwd), maxDirLength);
   const relativeTime = formatRelativeTime(session.updated_at);
   const isRunning = session.status === 'running';
   const isStopped = session.status === 'stopped';
-  const prompt = session.last_prompt ? truncatePrompt(session.last_prompt) : undefined;
-  const lastMessage = session.lastMessage ? truncateText(session.lastMessage, 40) : undefined;
-  const summary = isStopped && session.summary ? truncateText(session.summary, 40) : undefined;
   const shortId = truncateSessionId(session.session_id);
+
+  // Line 2: summary (📝 takes ~2 chars visually)
+  const summaryMaxLength = maxLineLength - 3;
+  const summary =
+    isStopped && session.summary ? truncateText(session.summary, summaryMaxLength) : undefined;
+
+  // Line 3: prompt and lastMessage share the space
+  const hasPrompt = !!session.last_prompt;
+  const hasLastMessage = !!session.lastMessage;
+  const arrowLength = hasPrompt && hasLastMessage ? 3 : 0; // " → "
+  const bracketLength = hasPrompt ? 2 : 0; // 「」
+  const availableForContent = maxLineLength - arrowLength - bracketLength;
+  // Split space: prompt gets 40%, lastMessage gets 60% (lastMessage is usually more important)
+  const promptMaxLength = hasLastMessage
+    ? Math.floor(availableForContent * 0.4)
+    : availableForContent;
+  const lastMessageMaxLength = hasPrompt
+    ? availableForContent - promptMaxLength
+    : availableForContent;
+  const prompt = session.last_prompt
+    ? truncatePrompt(session.last_prompt, promptMaxLength)
+    : undefined;
+  const lastMessage = session.lastMessage
+    ? truncateText(session.lastMessage, lastMessageMaxLength)
+    : undefined;
 
   return (
     <Box flexDirection="column" minHeight={3}>
