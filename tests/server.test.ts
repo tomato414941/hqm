@@ -31,6 +31,7 @@ vi.mock('../src/store/file-store.js', () => ({
 
 vi.mock('../src/utils/focus.js', () => ({
   focusSession: vi.fn(),
+  focusSessionByContext: vi.fn(),
 }));
 
 vi.mock('../src/utils/send-text.js', () => ({
@@ -45,14 +46,14 @@ vi.mock('../src/utils/transcript.js', () => ({
 }));
 
 import { clearSessions, getSessions } from '../src/store/file-store.js';
-import { focusSession } from '../src/utils/focus.js';
+import { focusSessionByContext } from '../src/utils/focus.js';
 import { sendTextToTerminal } from '../src/utils/send-text.js';
 import { getAllMessagesAsync, getTranscriptPath } from '../src/utils/transcript.js';
 
 const mockNetworkInterfaces = vi.mocked(networkInterfaces);
 const mockGetSessions = vi.mocked(getSessions);
 const mockClearSessions = vi.mocked(clearSessions);
-const mockFocusSession = vi.mocked(focusSession);
+const mockFocusSessionByContext = vi.mocked(focusSessionByContext);
 const mockSendTextToTerminal = vi.mocked(sendTextToTerminal);
 const mockGetTranscriptPath = vi.mocked(getTranscriptPath);
 const mockGetAllMessagesAsync = vi.mocked(getAllMessagesAsync);
@@ -294,26 +295,24 @@ describe('server', () => {
         JSON.stringify({
           type: 'focusResult',
           success: false,
-          error: 'Session not found or no TTY',
+          error: 'Session not found',
         })
       );
     });
 
-    it('sends error when session has no TTY', async () => {
+    it('sends false success when focusSessionByContext fails', async () => {
       const ws = createMockWebSocket();
       mockGetSessions.mockResolvedValue([
         { session_id: 'test-session', tty: '', cwd: '/tmp', status: 'active' },
       ]);
+      mockFocusSessionByContext.mockReturnValue(false);
 
       await handleFocusCommand(ws, 'test-session');
 
-      expect(ws.send).toHaveBeenCalledWith(
-        JSON.stringify({
-          type: 'focusResult',
-          success: false,
-          error: 'Session not found or no TTY',
-        })
+      expect(mockFocusSessionByContext).toHaveBeenCalledWith(
+        expect.objectContaining({ session_id: 'test-session' })
       );
+      expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: 'focusResult', success: false }));
     });
 
     it('sends success when focus succeeds', async () => {
@@ -321,11 +320,13 @@ describe('server', () => {
       mockGetSessions.mockResolvedValue([
         { session_id: 'test-session', tty: '/dev/pts/0', cwd: '/tmp', status: 'active' },
       ]);
-      mockFocusSession.mockReturnValue(true);
+      mockFocusSessionByContext.mockReturnValue(true);
 
       await handleFocusCommand(ws, 'test-session');
 
-      expect(mockFocusSession).toHaveBeenCalledWith('/dev/pts/0');
+      expect(mockFocusSessionByContext).toHaveBeenCalledWith(
+        expect.objectContaining({ session_id: 'test-session' })
+      );
       expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: 'focusResult', success: true }));
     });
   });

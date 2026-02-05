@@ -1,6 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { isCodexSessionId } from '../codex/paths.js';
 import type { HookEvent, Session, StoreData } from '../types/index.js';
 import { endPerf, startPerf } from '../utils/perf.js';
 import { getSessionKey } from '../utils/session-key.js';
@@ -8,7 +9,12 @@ import { determineStatus } from '../utils/session-status.js';
 import { parseISOTimestamp } from '../utils/time.js';
 import { getLastAssistantMessage, getTranscriptPath } from '../utils/transcript.js';
 import { getSessionTimeoutMs } from './config.js';
-import { addSessionToDisplayOrder, removeSessionFromDisplayOrder } from './display-order.js';
+import {
+  addSessionToDisplayOrder,
+  assignSessionToProject,
+  getSessionProjectFromStore,
+  removeSessionFromDisplayOrder,
+} from './display-order.js';
 import { getFieldUpdates } from './event-handlers.js';
 import { checkSessionsForCleanup } from './session-cleanup.js';
 import { syncTranscripts } from './transcript-sync.js';
@@ -43,20 +49,26 @@ function logDeletion(
 
 /**
  * Remove other sessions on the same TTY (they are stale)
+ * Returns the project ID of the first removed session for inheritance
  */
 function removeOtherSessionsOnSameTty(
   store: StoreData,
   currentSessionId: string,
   tty: string | undefined
-): void {
-  if (!tty) return;
+): string | undefined {
+  if (!tty) return undefined;
+  let inheritedProjectId: string | undefined;
 
   for (const [key, session] of Object.entries(store.sessions)) {
     if (session.session_id !== currentSessionId && session.tty === tty) {
+      if (!inheritedProjectId) {
+        inheritedProjectId = getSessionProjectFromStore(store, key);
+      }
       delete store.sessions[key];
       removeSessionFromDisplayOrder(store, key);
     }
   }
+  return inheritedProjectId;
 }
 
 /**
@@ -73,8 +85,10 @@ export function updateSessionInStore(
   const existing = store.sessions[key];
 
   // When a new session starts on a TTY, remove stale sessions on that TTY
+  // and inherit their project assignment
+  let inheritedProjectId: string | undefined;
   if (!existing && event.tty) {
-    removeOtherSessionsOnSameTty(store, event.session_id, event.tty);
+    inheritedProjectId = removeOtherSessionsOnSameTty(store, event.session_id, event.tty);
   }
 
   // Get field updates based on event type
@@ -100,6 +114,10 @@ export function updateSessionInStore(
     cwd: event.cwd,
     initial_cwd: existing?.initial_cwd ?? event.cwd,
     tty: event.tty ?? existing?.tty,
+    agent: existing?.agent ?? (isCodexSessionId(event.session_id) ? 'codex' : 'claude'),
+    source: existing?.source,
+    tmux_target: existing?.tmux_target,
+    tmux_pane_id: existing?.tmux_pane_id,
     status: determineStatus(event, existing?.status),
     created_at: existing?.created_at ?? now,
     updated_at: now,
@@ -116,6 +134,10 @@ export function updateSessionInStore(
   // Add new session to displayOrder (after ungrouped project, at the end)
   if (!existing) {
     addSessionToDisplayOrder(store, key);
+    // Inherit project from previous session on the same TTY
+    if (inheritedProjectId) {
+      assignSessionToProject(store, key, inheritedProjectId);
+    }
   }
 
   writeStore(store);
@@ -259,6 +281,31 @@ export function updateSessionSummaryInStore(
       session.summary_transcript_size = transcriptSize;
     }
     session.updated_at = new Date().toISOString();
+    store.sessions[key] = session;
+    writeStore(store);
+  }
+}
+
+/**
+ * Update session with latest assistant message
+ * Note: Searches by session_id only, ignoring TTY.
+ */
+export function updateSessionLastMessageInStore(
+  store: StoreData,
+  sessionId: string,
+  message: string,
+  writeStore: (data: StoreData) => void,
+  updatedAt?: string
+): void {
+  const entry = Object.entries(store.sessions).find(
+    ([, session]) => session.session_id === sessionId
+  );
+
+  if (entry) {
+    const [key, session] = entry;
+    if (session.lastMessage === message) return;
+    session.lastMessage = message;
+    session.updated_at = updatedAt ?? new Date().toISOString();
     store.sessions[key] = session;
     writeStore(store);
   }

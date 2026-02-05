@@ -1,14 +1,25 @@
 import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import type { WebSocketServer } from 'ws';
+import { startCodexWatcher } from '../codex/ingest.js';
+import { TMUX_REFRESH_INTERVAL_MS } from '../constants.js';
 import { generateSessionSummaryIfNeeded } from '../services/summary.js';
-import { getProjects, getSessions, getStorePath } from '../store/file-store.js';
+import {
+  getProjects,
+  getSessions,
+  getStorePath,
+  syncTmuxSessionsIfNeeded,
+  syncTmuxSessionsOnce,
+} from '../store/file-store.js';
 import { broadcastToClients } from './websocket.js';
 
 // Track sessions that are currently generating summaries
 const generatingSummaries = new Set<string>();
 
 export function createFileWatcher(wss: WebSocketServer): FSWatcher {
+  startCodexWatcher();
+  syncTmuxSessionsOnce();
+
   const storePath = getStorePath();
   const watcher = chokidar.watch(storePath, {
     ignoreInitial: true,
@@ -60,6 +71,13 @@ export function createFileWatcher(wss: WebSocketServer): FSWatcher {
       }
     })();
   });
+
+  const tmuxInterval = setInterval(syncTmuxSessionsIfNeeded, TMUX_REFRESH_INTERVAL_MS);
+  const originalClose = watcher.close.bind(watcher);
+  watcher.close = () => {
+    clearInterval(tmuxInterval);
+    return originalClose();
+  };
 
   return watcher;
 }

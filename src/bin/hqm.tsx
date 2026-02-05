@@ -2,6 +2,7 @@
 import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { render } from 'ink';
+import { codexSessionsDirExists } from '../codex/paths.js';
 import { Dashboard } from '../components/Dashboard.js';
 import { isHooksConfigured, setupHooks } from '../setup/index.js';
 import { clearAllAction, clearProjectsAction, clearSessionsAction } from './commands/clear.js';
@@ -73,14 +74,23 @@ interface GlobalOptions {
 }
 
 async function defaultAction(options: GlobalOptions) {
-  if (!isHooksConfigured()) {
-    console.log('Initial setup required.\n');
-    await setupHooks();
+  const codexDisabled = process.env.HQM_DISABLE_CODEX;
+  const codexEnabled = !(codexDisabled === '1' || codexDisabled?.toLowerCase() === 'true');
+  const hasCodex = codexEnabled && codexSessionsDirExists();
 
-    if (!isHooksConfigured()) {
-      return;
+  if (!isHooksConfigured()) {
+    if (hasCodex) {
+      console.log('Claude hooks not configured. Monitoring Codex sessions only.');
+      console.log('Run `hqm setup` to enable Claude Code hooks.\n');
+    } else {
+      console.log('Initial setup required.\n');
+      await setupHooks();
+
+      if (!isHooksConfigured()) {
+        return;
+      }
+      console.log('');
     }
-    console.log('');
   }
 
   await runWithAltScreen(() => render(<Dashboard showQR={options.qr} showUrl={options.url} />));

@@ -1,9 +1,20 @@
 import chokidar from 'chokidar';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SESSION_REFRESH_INTERVAL_MS, SESSION_UPDATE_DEBOUNCE_MS } from '../constants.js';
+import { startCodexWatcher } from '../codex/ingest.js';
+import {
+  SESSION_REFRESH_INTERVAL_MS,
+  SESSION_UPDATE_DEBOUNCE_MS,
+  TMUX_REFRESH_INTERVAL_MS,
+} from '../constants.js';
 import { generateSessionSummaryIfNeeded } from '../services/summary.js';
 import { getSessionTimeoutMs } from '../store/config.js';
-import { getProjects, getSessions, getStorePath } from '../store/file-store.js';
+import {
+  getProjects,
+  getSessions,
+  getStorePath,
+  syncTmuxSessionsIfNeeded,
+  syncTmuxSessionsOnce,
+} from '../store/file-store.js';
 import type { Project, Session } from '../types/index.js';
 
 // Track sessions that are currently generating summaries
@@ -74,6 +85,9 @@ export function useSessions(): {
   }, [loadSessions]);
 
   useEffect(() => {
+    startCodexWatcher();
+    syncTmuxSessionsOnce();
+
     // Initial load (immediate, no debounce)
     loadSessions();
 
@@ -99,11 +113,14 @@ export function useSessions(): {
       interval = setInterval(loadSessions, SESSION_REFRESH_INTERVAL_MS);
     }
 
+    const tmuxInterval = setInterval(syncTmuxSessionsIfNeeded, TMUX_REFRESH_INTERVAL_MS);
+
     return () => {
       watcher.close();
       if (interval) {
         clearInterval(interval);
       }
+      clearInterval(tmuxInterval);
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }

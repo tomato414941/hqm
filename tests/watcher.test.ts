@@ -19,6 +19,13 @@ vi.mock('../src/store/file-store.js', () => ({
   getSessions: () => mockGetSessions(),
   getProjects: () => mockGetProjects(),
   getStorePath: () => '/tmp/sessions.json',
+  syncTmuxSessionsOnce: vi.fn(),
+  syncTmuxSessionsIfNeeded: vi.fn(),
+}));
+
+// Mock codex ingest
+vi.mock('../src/codex/ingest.js', () => ({
+  startCodexWatcher: vi.fn(),
 }));
 
 // Mock summary service

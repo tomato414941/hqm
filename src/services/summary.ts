@@ -1,14 +1,10 @@
-import { readFileSync, statSync } from 'node:fs';
+import { statSync } from 'node:fs';
 import Anthropic from '@anthropic-ai/sdk';
 import { SUMMARY_REGENERATE_THRESHOLD_BYTES } from '../constants.js';
 import { getSummaryConfig, isSummaryEnabled } from '../store/config.js';
 import { updateSessionSummary } from '../store/file-store.js';
 import type { Session } from '../types/index.js';
-import {
-  type EntryContent,
-  extractTextFromContent,
-  getTranscriptPath,
-} from '../utils/transcript.js';
+import { getAllMessages, getTranscriptPath } from '../utils/transcript.js';
 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -29,39 +25,26 @@ export interface SummaryResult {
  */
 export { isSummaryEnabled };
 
-interface TranscriptEntry {
-  type: 'user' | 'assistant';
-  message?: {
-    content?: EntryContent;
-  };
-}
-
 /**
  * Read and parse transcript from JSONL file
  */
 function readTranscript(transcriptPath: string): string {
   try {
-    const content = readFileSync(transcriptPath, 'utf-8');
-    const lines = content.trim().split('\n');
-    const messages: string[] = [];
-
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line) as TranscriptEntry;
-        if (entry.type !== 'user' && entry.type !== 'assistant') continue;
-
-        const text = extractTextFromContent(entry.message?.content);
-        if (text?.trim()) {
-          const role = entry.type === 'user' ? 'User' : 'Assistant';
-          messages.push(`${role}: ${text.trim()}`);
-        }
-      } catch {
-        // Skip invalid JSON lines
-      }
+    const { messages } = getAllMessages(transcriptPath, {
+      limit: Number.MAX_SAFE_INTEGER,
+      offset: 0,
+    });
+    if (messages.length === 0) {
+      return '';
     }
 
-    // Return last portion if too long (to stay within token limits)
-    const fullText = messages.join('\n\n');
+    const fullText = messages
+      .map((message) => {
+        const role = message.type === 'user' ? 'User' : 'Assistant';
+        return `${role}: ${message.content.trim()}`;
+      })
+      .join('\n\n');
+
     const maxChars = 50000; // Roughly 12k tokens
     if (fullText.length > maxChars) {
       return `...\n\n${fullText.slice(-maxChars)}`;

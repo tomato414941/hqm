@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   MAX_VISIBLE_SESSIONS,
   PENDING_ASSIGNMENT_TIMEOUT_MS,
+  QR_PANEL_MARGIN_LEFT,
+  QR_PANEL_PADDING_X,
   QUICK_SELECT_KEYS,
   SESSION_CARD_HEIGHT,
 } from '../constants.js';
@@ -25,8 +27,8 @@ import {
 } from '../store/file-store.js';
 import type { DisplayOrderItem, Project, Session } from '../types/index.js';
 import { debugLog } from '../utils/debug.js';
-import { createNewSession, focusSession } from '../utils/focus.js';
-import { shouldShowQRCode } from '../utils/qr-display.js';
+import { createNewSession, focusSessionByContext } from '../utils/focus.js';
+import { getQrPanelMetrics, shouldShowQRCode } from '../utils/qr-display.js';
 import { ConfirmModal, ProjectAssignModal, ProjectManageModal } from './dashboard/index.js';
 import { SessionCard } from './SessionCard.js';
 
@@ -247,8 +249,19 @@ export function Dashboard({
   const pendingAssignmentRef = useRef<PendingAssignment | null>(null);
   const { exit } = useApp();
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
+  const qrMetrics = useMemo(() => getQrPanelMetrics(qrCode), [qrCode]);
   const showQR = shouldShowQRCode(showQRProp, showUrlProp, terminalHeight, terminalWidth, qrCode);
   const showUrlText = showUrlProp && !showQR && url && !serverLoading;
+  const mainPanelWidth = useMemo(() => {
+    if (!showQR || !qrMetrics) return terminalWidth;
+    return Math.max(0, terminalWidth - QR_PANEL_MARGIN_LEFT - qrMetrics.panelWidth);
+  }, [showQR, qrMetrics, terminalWidth]);
+  const sessionListWidth = useMemo(() => {
+    const borderWidth = 2; // round border adds left+right
+    const paddingX = 1; // matches list container paddingX
+    const rowPaddingLeft = 1; // matches SessionCard wrapper paddingLeft
+    return Math.max(0, mainPanelWidth - borderWidth - paddingX * 2 - rowPaddingLeft);
+  }, [mainPanelWidth]);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -343,8 +356,8 @@ export function Dashboard({
   const focusSessionByIndex = useCallback(
     (index: number) => {
       const session = displayOrder[index];
-      if (session?.tty) {
-        focusSession(session.tty);
+      if (session) {
+        focusSessionByContext(session);
       }
     },
     [displayOrder]
@@ -449,9 +462,7 @@ export function Dashboard({
       if (displayIdx >= 0 && displayIdx < displayOrder.length) {
         const session = displayOrder[displayIdx];
         setSelectedSessionKey(session.session_id);
-        if (session.tty) {
-          focusSession(session.tty);
-        }
+        focusSessionByContext(session);
       }
     },
     [displayOrder]
@@ -775,7 +786,7 @@ export function Dashboard({
               maxVisibleSessions={maxVisibleSessions}
               selectedIndex={selectedIndex}
               displayOrder={displayOrder}
-              terminalColumns={terminalWidth}
+              terminalColumns={sessionListWidth}
             />
           )}
         </Box>
@@ -800,10 +811,11 @@ export function Dashboard({
       {showQR && (
         <Box
           flexDirection="column"
-          marginLeft={2}
+          marginLeft={QR_PANEL_MARGIN_LEFT}
           borderStyle="round"
           borderColor="gray"
-          paddingX={1}
+          paddingX={QR_PANEL_PADDING_X}
+          minWidth={qrMetrics?.panelWidth}
         >
           <Text bold dimColor>
             Mobile

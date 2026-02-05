@@ -2,6 +2,8 @@ import { createReadStream, existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
+import { isCodexSessionId } from '../codex/paths.js';
+import { getCodexTranscriptPath } from '../codex/registry.js';
 import type { ConversationMessage } from '../types/index.js';
 import { debugLog } from './debug.js';
 import { getTranscriptPathFromRegistry } from './session-registry.js';
@@ -20,6 +22,10 @@ export function buildTranscriptPath(cwd: string, sessionId: string): string {
  * Get transcript path for a session, using SessionRegistry with fallback to path building
  */
 export function getTranscriptPath(sessionId: string, cwd?: string): string | undefined {
+  if (isCodexSessionId(sessionId)) {
+    return getCodexTranscriptPath(sessionId);
+  }
+
   // Try registry first (most accurate)
   const registryPath = getTranscriptPathFromRegistry(sessionId);
   if (registryPath) {
@@ -48,6 +54,12 @@ interface TranscriptEntry {
     role?: string;
     content?: EntryContent;
   };
+}
+
+interface CodexEntry {
+  timestamp?: string;
+  type?: string;
+  payload?: Record<string, unknown>;
 }
 
 interface GetAllMessagesOptions {
@@ -97,11 +109,25 @@ function extractTextContent(entry: TranscriptEntry): string | null {
 
 interface MessageCollector {
   addEntry(entry: TranscriptEntry): void;
+  addCodexEntry(entry: CodexEntry): void;
   getResult(options: GetAllMessagesOptions): GetAllMessagesResult;
 }
 
 function createMessageCollector(): MessageCollector {
   const allMessages: ConversationMessage[] = [];
+  let lastMessage: ConversationMessage | null = null;
+
+  const pushMessage = (message: ConversationMessage): void => {
+    if (
+      lastMessage &&
+      lastMessage.type === message.type &&
+      lastMessage.content === message.content
+    ) {
+      return;
+    }
+    allMessages.push(message);
+    lastMessage = message;
+  };
 
   return {
     addEntry(entry: TranscriptEntry): void {
@@ -110,12 +136,18 @@ function createMessageCollector(): MessageCollector {
       const text = extractTextContent(entry);
       if (!text) return;
 
-      allMessages.push({
+      pushMessage({
         id: entry.uuid || `msg-${allMessages.length}`,
         type: entry.type,
         content: text,
         timestamp: entry.timestamp,
       });
+    },
+
+    addCodexEntry(entry: CodexEntry): void {
+      const message = extractCodexMessage(entry, allMessages.length);
+      if (!message) return;
+      pushMessage(message);
     },
 
     getResult({ limit = 50, offset = 0 }): GetAllMessagesResult {
@@ -128,6 +160,68 @@ function createMessageCollector(): MessageCollector {
       };
     },
   };
+}
+
+function extractCodexText(content: unknown): string | null {
+  if (!content) return null;
+  if (typeof content === 'string') {
+    return content.trim() || null;
+  }
+  if (!Array.isArray(content)) return null;
+
+  const text = content
+    .filter((part) => part && typeof part === 'object' && 'text' in part)
+    .filter((part) => {
+      if (!part || typeof part !== 'object') return false;
+      if (!('type' in part)) return true;
+      return (part as { type?: string }).type === 'output_text';
+    })
+    .map((part) => (part as { text?: string }).text)
+    .filter((part): part is string => typeof part === 'string' && part.length > 0)
+    .join('\n')
+    .trim();
+
+  return text || null;
+}
+
+function extractCodexMessage(entry: CodexEntry, index: number): ConversationMessage | null {
+  if (!entry || typeof entry !== 'object') return null;
+
+  if (entry.type === 'event_msg') {
+    const payload = entry.payload || {};
+    if (payload.type === 'user_message' && typeof payload.message === 'string') {
+      return {
+        id: `codex-user-${index}`,
+        type: 'user',
+        content: payload.message,
+        timestamp: entry.timestamp,
+      };
+    }
+    if (payload.type === 'agent_message' && typeof payload.message === 'string') {
+      return {
+        id: `codex-assistant-${index}`,
+        type: 'assistant',
+        content: payload.message,
+        timestamp: entry.timestamp,
+      };
+    }
+  }
+
+  if (entry.type === 'response_item') {
+    const payload = entry.payload || {};
+    if (payload.type === 'message' && payload.role === 'assistant') {
+      const text = extractCodexText(payload.content);
+      if (!text) return null;
+      return {
+        id: `codex-assistant-${index}`,
+        type: 'assistant',
+        content: text,
+        timestamp: entry.timestamp,
+      };
+    }
+  }
+
+  return null;
 }
 
 function logParseErrors(parseErrors: number, transcriptPath: string): void {
@@ -152,8 +246,9 @@ export function getAllMessages(
 
     for (const line of lines) {
       try {
-        const entry = JSON.parse(line) as TranscriptEntry;
+        const entry = JSON.parse(line) as TranscriptEntry & CodexEntry;
         collector.addEntry(entry);
+        collector.addCodexEntry(entry);
       } catch (e) {
         parseErrors++;
         if (parseErrors <= 3) {
@@ -179,6 +274,32 @@ interface TranscriptMessage {
   };
 }
 
+function extractClaudeAssistantMessage(entry: TranscriptMessage): string | null {
+  if (entry.type !== 'assistant' || !entry.message?.content) return null;
+  const textParts = entry.message.content
+    .filter((c) => c.type === 'text' && c.text)
+    .map((c) => c.text)
+    .join('\n');
+  return textParts || null;
+}
+
+function extractCodexAssistantMessage(entry: CodexEntry): string | null {
+  if (!entry || typeof entry !== 'object') return null;
+  if (entry.type === 'event_msg') {
+    const payload = entry.payload || {};
+    if (payload.type === 'agent_message' && typeof payload.message === 'string') {
+      return payload.message;
+    }
+  }
+  if (entry.type === 'response_item') {
+    const payload = entry.payload || {};
+    if (payload.type === 'message' && payload.role === 'assistant') {
+      return extractCodexText(payload.content);
+    }
+  }
+  return null;
+}
+
 export function getLastAssistantMessage(transcriptPath: string): string | undefined {
   if (!existsSync(transcriptPath)) {
     return undefined;
@@ -191,16 +312,14 @@ export function getLastAssistantMessage(transcriptPath: string): string | undefi
     // Iterate from the end to find the last assistant message
     for (let i = lines.length - 1; i >= 0; i--) {
       try {
-        const entry = JSON.parse(lines[i]) as TranscriptMessage;
-        if (entry.type === 'assistant' && entry.message?.content) {
-          // Extract text from content array
-          const textParts = entry.message.content
-            .filter((c) => c.type === 'text' && c.text)
-            .map((c) => c.text)
-            .join('\n');
-          if (textParts) {
-            return textParts;
-          }
+        const entry = JSON.parse(lines[i]) as TranscriptMessage & CodexEntry;
+        const claudeText = extractClaudeAssistantMessage(entry);
+        if (claudeText) {
+          return claudeText;
+        }
+        const codexText = extractCodexAssistantMessage(entry);
+        if (codexText) {
+          return codexText;
         }
       } catch {
         // Skip invalid JSON lines
@@ -238,8 +357,9 @@ export async function getAllMessagesAsync(
       if (!line.trim()) continue;
 
       try {
-        const entry = JSON.parse(line) as TranscriptEntry;
+        const entry = JSON.parse(line) as TranscriptEntry & CodexEntry;
         collector.addEntry(entry);
+        collector.addCodexEntry(entry);
       } catch (e) {
         parseErrors++;
         if (parseErrors <= 3) {

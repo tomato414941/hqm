@@ -1,7 +1,7 @@
 {
   "name": "hqm",
   "version": "1.0.0",
-  "description": "CLI for monitoring multiple Claude Code sessions in real-time (Linux)",
+  "description": "CLI for monitoring multiple Claude Code and Codex sessions in real-time (Linux)",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -43,7 +43,8 @@
     "terminal",
     "session",
     "linux",
-    "tmux"
+    "tmux",
+    "codex"
   ],
   "license": "MIT",
   "engines": {

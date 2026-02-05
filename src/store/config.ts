@@ -34,7 +34,7 @@ export interface HqmConfig {
  * Default configuration values
  */
 const DEFAULT_CONFIG: HqmConfig = {
-  sessionTimeoutMinutes: 0, // No timeout by default
+  sessionTimeoutMinutes: 0,
 };
 
 /**

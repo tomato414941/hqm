@@ -23,6 +23,10 @@ export interface Session {
   cwd: string;
   initial_cwd: string;
   tty?: string;
+  agent?: 'claude' | 'codex';
+  source?: 'tmux';
+  tmux_target?: string;
+  tmux_pane_id?: string;
   status: SessionStatus;
   created_at: string;
   updated_at: string;

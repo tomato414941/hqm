@@ -1,7 +1,10 @@
+import cliTruncate from 'cli-truncate';
+
 /**
  * Truncate text for display, replacing newlines with spaces.
+ * Uses cli-truncate for proper terminal width calculation (CJK characters, emojis).
  * @param text - The text to truncate
- * @param maxLength - Maximum length (default: 50)
+ * @param maxLength - Maximum terminal width (default: 50)
  * @returns Truncated text with ellipsis if needed
  */
 export function truncateText(text: string, maxLength = 50): string {
@@ -10,9 +13,5 @@ export function truncateText(text: string, maxLength = 50): string {
     .replace(/\s+/g, ' ')
     .trim();
 
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, maxLength - 1)}…`;
+  return cliTruncate(normalized, maxLength);
 }

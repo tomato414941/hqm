@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HQM is a TUI dashboard for monitoring multiple Claude Code sessions in real-time on Linux.
+HQM is a TUI dashboard for monitoring multiple Claude Code and Codex sessions in real-time on Linux.
 
 Based on: https://github.com/onikan27/claude-code-monitor It uses Claude Code hooks to track session activity and displays status in a terminal interface.
 
@@ -31,6 +31,10 @@ npx vitest run tests/file-store.test.ts
 Claude Code triggers hooks → `hqm hook <event>` CLI receives JSON via stdin → `handler.ts` validates and parses → `file-store.ts` updates `~/.hqm/sessions.json`
 
 Supported hook events: `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Notification`, `Stop`
+
+### Codex Flow
+Codex writes JSONL logs under `~/.codex/sessions` → `codex/ingest.ts` tails log updates → `file-store.ts` updates `~/.hqm/sessions.json`
+Startup ingestion can be limited with `HQM_CODEX_RECENT_MINUTES` (or non-zero `hqm config timeout`).
 
 ### TUI Flow
 `Dashboard.tsx` renders with Ink → `useSessions.ts` watches `sessions.json` with chokidar → `SessionCard.tsx` displays each session

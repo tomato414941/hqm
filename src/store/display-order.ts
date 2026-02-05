@@ -1,4 +1,5 @@
 import type { DisplayOrderItem, StoreData } from '../types/index.js';
+import { logDisplayOrderChange } from '../utils/display-order-log.js';
 import { UNGROUPED_PROJECT_ID } from './migrations.js';
 
 export { UNGROUPED_PROJECT_ID };
@@ -97,6 +98,8 @@ export function assignSessionToProject(
 ): void {
   if (!store.displayOrder) return;
 
+  const before = [...store.displayOrder];
+
   // Remove session from current position
   store.displayOrder = store.displayOrder.filter(
     (item) => !(item.type === 'session' && item.key === sessionKey)
@@ -114,6 +117,14 @@ export function assignSessionToProject(
     // Project not found, add to end
     store.displayOrder.push({ type: 'session', key: sessionKey });
   }
+
+  logDisplayOrderChange('assign_project', {
+    sessionKey,
+    projectId,
+    before,
+    after: store.displayOrder,
+    extra: { projectFound: projectIndex !== -1 },
+  });
 
   // Record cwd association for non-ungrouped projects
   if (projectId && projectId !== UNGROUPED_PROJECT_ID && store.projects?.[projectId]) {
@@ -259,6 +270,8 @@ export function addSessionToDisplayOrder(store: StoreData, sessionKey: string): 
     return;
   }
 
+  const before = [...store.displayOrder];
+
   // Try to find matching project by cwd
   const session = store.sessions[sessionKey];
   if (session) {
@@ -278,6 +291,12 @@ export function addSessionToDisplayOrder(store: StoreData, sessionKey: string): 
           insertIndex++;
         }
         store.displayOrder.splice(insertIndex, 0, { type: 'session', key: sessionKey });
+        logDisplayOrderChange('add_session', {
+          sessionKey,
+          before,
+          after: store.displayOrder,
+          extra: { matchedProjectId: matchingProjectId, cwd },
+        });
         return;
       }
     }
@@ -294,6 +313,13 @@ export function addSessionToDisplayOrder(store: StoreData, sessionKey: string): 
     // No ungrouped project found, add to end
     store.displayOrder.push({ type: 'session', key: sessionKey });
   }
+
+  logDisplayOrderChange('add_session', {
+    sessionKey,
+    before,
+    after: store.displayOrder,
+    extra: { matchedProjectId: undefined, cwd: session?.initial_cwd || session?.cwd },
+  });
 }
 
 /**
@@ -301,8 +327,16 @@ export function addSessionToDisplayOrder(store: StoreData, sessionKey: string): 
  */
 export function removeSessionFromDisplayOrder(store: StoreData, sessionKey: string): void {
   if (store.displayOrder) {
+    const before = [...store.displayOrder];
     store.displayOrder = store.displayOrder.filter(
       (item) => !(item.type === 'session' && item.key === sessionKey)
     );
+    if (before.length !== store.displayOrder.length) {
+      logDisplayOrderChange('remove_session', {
+        sessionKey,
+        before,
+        after: store.displayOrder,
+      });
+    }
   }
 }

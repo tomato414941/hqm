@@ -1,6 +1,7 @@
 import { Box, Text } from 'ink';
 import type React from 'react';
 import { memo } from 'react';
+import { CODEX_SESSION_PREFIX } from '../codex/paths.js';
 import type { Session } from '../types/index.js';
 import { truncatePrompt } from '../utils/cli-prompt.js';
 import { abbreviateHomePath } from '../utils/path.js';
@@ -16,8 +17,11 @@ interface SessionCardProps {
   terminalColumns: number;
 }
 
-function truncateSessionId(sessionId: string): string {
-  return sessionId.slice(0, 8);
+function truncateSessionId(sessionId: string, isCodex: boolean): string {
+  const withoutPrefix = sessionId.startsWith(CODEX_SESSION_PREFIX)
+    ? sessionId.slice(CODEX_SESSION_PREFIX.length)
+    : sessionId.replace(/^tmux-/, '');
+  return `${isCodex ? 'X' : 'A'}${withoutPrefix.slice(0, 7)}`;
 }
 
 // Indentation for lines 2-4 to align with content after "> [n] "
@@ -36,6 +40,7 @@ function arePropsEqual(prevProps: SessionCardProps, nextProps: SessionCardProps)
     prev.status === next.status &&
     prev.updated_at === next.updated_at &&
     prev.cwd === next.cwd &&
+    prev.agent === next.agent &&
     prev.last_prompt === next.last_prompt &&
     prev.current_tool === next.current_tool &&
     prev.notification_type === next.notification_type &&
@@ -44,8 +49,9 @@ function arePropsEqual(prevProps: SessionCardProps, nextProps: SessionCardProps)
   );
 }
 
-// Fixed elements width: "> [n] " (6) + status (18) + time (9) + "#shortId " (10) + padding (2) = 45
-const LINE1_FIXED_WIDTH = 45;
+// Fixed elements width excluding ID label:
+// "> [n] " (6) + status (18) + time (9) + padding (2) = 35
+const LINE1_BASE_WIDTH = 35;
 // Line 2/3 indent: "      " (6) + paddingX (2) = 8
 const LINE_INDENT_WIDTH = 8;
 const MIN_CONTENT_LENGTH = 20;
@@ -57,13 +63,19 @@ export const SessionCard = memo(function SessionCard({
   terminalColumns,
 }: SessionCardProps): React.ReactElement {
   const { symbol, color, label } = getExtendedStatusDisplay(session);
-  const maxDirLength = Math.max(MIN_CONTENT_LENGTH, terminalColumns - LINE1_FIXED_WIDTH);
+  const agent =
+    session.agent ?? (session.session_id.startsWith(CODEX_SESSION_PREFIX) ? 'codex' : 'claude');
+  const isCodex = agent === 'codex';
+  const shortId = truncateSessionId(session.session_id, isCodex);
+  const idLabel = isCodex ? '[Codex]' : '[Claude]';
+  const idText = `${idLabel} #${shortId}`;
+  const line1FixedWidth = LINE1_BASE_WIDTH + idText.length + 1; // +1 for trailing space
+  const maxDirLength = Math.max(MIN_CONTENT_LENGTH, terminalColumns - line1FixedWidth);
   const maxLineLength = Math.max(MIN_CONTENT_LENGTH, terminalColumns - LINE_INDENT_WIDTH);
   const dir = truncateText(abbreviateHomePath(session.cwd), maxDirLength);
   const relativeTime = formatRelativeTime(session.updated_at);
   const isRunning = session.status === 'running';
   const isStopped = session.status === 'stopped';
-  const shortId = truncateSessionId(session.session_id);
 
   // Line 2: summary (📝 takes ~2 chars visually)
   const summaryMaxLength = maxLineLength - 3;
@@ -73,8 +85,8 @@ export const SessionCard = memo(function SessionCard({
   // Line 3: prompt and lastMessage share the space
   const hasPrompt = !!session.last_prompt;
   const hasLastMessage = !!session.lastMessage;
-  const arrowLength = hasPrompt && hasLastMessage ? 3 : 0; // " → "
-  const bracketLength = hasPrompt ? 2 : 0; // 「」
+  const arrowLength = hasPrompt && hasLastMessage ? 3 : 0; // " → " (→ is halfwidth=1 in string-width)
+  const bracketLength = hasPrompt ? 4 : 0; // 「」 (each is fullwidth = 2)
   const availableForContent = maxLineLength - arrowLength - bracketLength;
   // Split space: prompt gets 40%, lastMessage gets 60% (lastMessage is usually more important)
   const promptMaxLength = hasLastMessage
@@ -112,7 +124,7 @@ export const SessionCard = memo(function SessionCard({
         </Box>
         <Text> </Text>
         <Text dimColor>{relativeTime.padEnd(8)}</Text>
-        <Text color="gray">#{shortId} </Text>
+        <Text color={isCodex ? 'green' : 'yellow'}>{idText} </Text>
         <Text color={isSelected ? 'white' : 'gray'}>{dir}</Text>
       </Box>
       {/* Line 2: Summary (if stopped and has summary) */}

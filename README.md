@@ -1,12 +1,12 @@
 # HQM
 
-A TUI/Web dashboard for monitoring multiple Claude Code sessions in real-time on Linux.
+A TUI/Web dashboard for monitoring multiple Claude Code and Codex sessions in real-time on Linux.
 
 ## Features
 
 - **TUI Dashboard**: Terminal-based interface using Ink/React
 - **Mobile Web UI**: Monitor sessions from your phone via QR code
-- **Real-time Updates**: Watches session activity via Claude Code hooks
+- **Real-time Updates**: Watches session activity via Claude Code hooks and Codex local logs
 - **Session Management**: View status, current tool, and messages for each session
 - **Project Management**: Organize sessions into projects
 
@@ -25,6 +25,8 @@ hqm setup
 ```
 
 This adds hooks to `~/.claude/settings.json`.
+
+Codex sessions are detected automatically from local Codex logs (no setup required).
 
 ## Usage
 
@@ -89,6 +91,17 @@ Requires an Anthropic API key. Uses `claude-haiku-4-20250514` by default.
 - Linux
 - Node.js >= 18
 - Claude Code CLI
+- Codex CLI (optional)
+
+## Codex Support
+
+HQM reads Codex session logs from your local Codex state directory (`CODEX_HOME`, defaults to `~/.codex`).
+Because Codex does not expose hook events, session end detection relies on inactivity timeout
+(`hqm config timeout`) if you want sessions to auto-expire.
+
+Set `HQM_DISABLE_CODEX=1` to disable Codex log ingestion.
+To avoid scanning old Codex logs on startup, set `HQM_CODEX_RECENT_MINUTES` (or set a non-zero
+`hqm config timeout`, which is used as the default active window when the env var is not set).
 
 ## Credits
 
