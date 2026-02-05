@@ -46,7 +46,6 @@ export interface Project {
   name: string;
   created_at: string;
   order?: number;
-  assignedCwds?: string[]; // cwds assigned to this project for auto-assignment
 }
 
 // Display order item (project or session)

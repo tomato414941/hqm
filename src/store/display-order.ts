@@ -76,19 +76,6 @@ export function moveSessionInDisplayOrder(
 }
 
 /**
- * Find project ID by cwd (for auto-assignment)
- */
-export function findProjectByCwd(store: StoreData, cwd: string): string | undefined {
-  if (!store.projects) return undefined;
-  for (const [projectId, project] of Object.entries(store.projects)) {
-    if (project.assignedCwds?.includes(cwd)) {
-      return projectId;
-    }
-  }
-  return undefined;
-}
-
-/**
  * Assign a session to a project (insert after the project in displayOrder)
  */
 export function assignSessionToProject(
@@ -125,20 +112,6 @@ export function assignSessionToProject(
     after: store.displayOrder,
     extra: { projectFound: projectIndex !== -1 },
   });
-
-  // Record cwd association for non-ungrouped projects
-  if (projectId && projectId !== UNGROUPED_PROJECT_ID && store.projects?.[projectId]) {
-    const session = store.sessions[sessionKey];
-    if (session) {
-      const project = store.projects[projectId];
-      if (!project.assignedCwds) project.assignedCwds = [];
-      // Use initial_cwd for stability (cwd can change during session)
-      const cwd = session.initial_cwd || session.cwd;
-      if (!project.assignedCwds.includes(cwd)) {
-        project.assignedCwds.push(cwd);
-      }
-    }
-  }
 }
 
 /**
@@ -272,53 +245,22 @@ export function addSessionToDisplayOrder(store: StoreData, sessionKey: string): 
 
   const before = [...store.displayOrder];
 
-  // Try to find matching project by cwd
-  const session = store.sessions[sessionKey];
-  if (session) {
-    const cwd = session.initial_cwd || session.cwd;
-    const matchingProjectId = findProjectByCwd(store, cwd);
-    if (matchingProjectId) {
-      // Insert after the matching project (at the end of its sessions)
-      const projectIndex = store.displayOrder.findIndex(
-        (item) => item.type === 'project' && item.id === matchingProjectId
-      );
-      if (projectIndex !== -1) {
-        // Find where to insert (after project's existing sessions)
-        let insertIndex = projectIndex + 1;
-        while (insertIndex < store.displayOrder.length) {
-          const item = store.displayOrder[insertIndex];
-          if (item.type === 'project') break;
-          insertIndex++;
-        }
-        store.displayOrder.splice(insertIndex, 0, { type: 'session', key: sessionKey });
-        logDisplayOrderChange('add_session', {
-          sessionKey,
-          before,
-          after: store.displayOrder,
-          extra: { matchedProjectId: matchingProjectId, cwd },
-        });
-        return;
-      }
-    }
-  }
-
-  // Default: add to ungrouped
+  // Always add to ungrouped (user manually assigns to projects)
   const ungroupedIndex = store.displayOrder.findIndex(
     (item) => item.type === 'project' && item.id === UNGROUPED_PROJECT_ID
   );
   if (ungroupedIndex !== -1) {
-    // Insert right after ungrouped project
     store.displayOrder.splice(ungroupedIndex + 1, 0, { type: 'session', key: sessionKey });
   } else {
-    // No ungrouped project found, add to end
     store.displayOrder.push({ type: 'session', key: sessionKey });
   }
 
+  const session = store.sessions[sessionKey];
   logDisplayOrderChange('add_session', {
     sessionKey,
     before,
     after: store.displayOrder,
-    extra: { matchedProjectId: undefined, cwd: session?.initial_cwd || session?.cwd },
+    extra: { cwd: session?.initial_cwd || session?.cwd },
   });
 }
 

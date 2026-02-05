@@ -132,3 +132,14 @@ export function migrateSessionKeys(store: StoreData): void {
 
   store.sessions = newSessions;
 }
+
+/**
+ * Remove assignedCwds from all projects (deprecated feature)
+ */
+export function migrateRemoveAssignedCwds(store: StoreData): void {
+  if (!store.projects) return;
+  for (const project of Object.values(store.projects)) {
+    // biome-ignore lint/suspicious/noExplicitAny: cleaning up deprecated field from stored data
+    delete (project as any).assignedCwds;
+  }
+}

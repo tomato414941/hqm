@@ -92,6 +92,5 @@ Config is stored in `~/.hqm/config.json`.
 
 ### Session clear loses project association
 - **Current**: `clearSessions` removes all session items from displayOrder
-- **Issue**: New sessions are added to "ungrouped" since previous association is lost
-- **Root cause**: No persistent session→project mapping exists
-- **Solution**: Store cwd→project mapping in Project (`assignedCwds` field)
+- **Issue**: New sessions are always added to "ungrouped" after clear
+- **Design**: `assignedCwds` auto-assignment was removed (caused mis-grouping with broad paths like `/home/dev`). New sessions always go to ungrouped; users assign manually. TTY inheritance is preserved.

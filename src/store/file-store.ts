@@ -19,7 +19,11 @@ import {
   reorderProjectInStore,
   UNGROUPED_PROJECT_ID,
 } from './display-order.js';
-import { migrateSessionKeys, migrateToDisplayOrder } from './migrations.js';
+import {
+  migrateRemoveAssignedCwds,
+  migrateSessionKeys,
+  migrateToDisplayOrder,
+} from './migrations.js';
 import {
   clearAllProjectsFromStore,
   createProjectInStore,
@@ -172,6 +176,8 @@ export function readStore(): StoreData {
     migrateToDisplayOrder(parsed);
     // Migrate session keys from session_id:tty to session_id only
     migrateSessionKeys(parsed);
+    // Remove deprecated assignedCwds from projects
+    migrateRemoveAssignedCwds(parsed);
     return parsed;
   } catch {
     return getEmptyStoreData();
