@@ -21,6 +21,12 @@ vi.mock('../src/store/file-store.js', () => ({
   getStorePath: () => '/tmp/sessions.json',
   syncTmuxSessionsOnce: vi.fn(),
   syncTmuxSessionsIfNeeded: vi.fn(),
+  cleanupStaleSessions: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Mock config
+vi.mock('../src/store/config.js', () => ({
+  getSessionTimeoutMs: () => 0,
 }));
 
 // Mock codex ingest
@@ -72,7 +78,7 @@ describe('watcher', () => {
           updated_at: new Date().toISOString(),
         },
       ];
-      mockGetSessions.mockResolvedValue(sessions);
+      mockGetSessions.mockReturnValue(sessions);
 
       createFileWatcher(mockWss as never);
 
@@ -108,7 +114,7 @@ describe('watcher', () => {
           needs_summary: true,
         },
       ];
-      mockGetSessions.mockResolvedValue(sessions);
+      mockGetSessions.mockReturnValue(sessions);
       mockGenerateSummary.mockResolvedValue('Generated summary');
 
       createFileWatcher(mockWss as never);
@@ -137,7 +143,7 @@ describe('watcher', () => {
           needs_summary: false,
         },
       ];
-      mockGetSessions.mockResolvedValue(sessions);
+      mockGetSessions.mockReturnValue(sessions);
 
       createFileWatcher(mockWss as never);
 
@@ -163,7 +169,7 @@ describe('watcher', () => {
           updated_at: new Date().toISOString(),
         },
       ];
-      mockGetSessions.mockResolvedValue(sessions);
+      mockGetSessions.mockReturnValue(sessions);
 
       createFileWatcher(mockWss as never);
 

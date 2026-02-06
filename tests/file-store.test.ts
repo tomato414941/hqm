@@ -340,7 +340,9 @@ describe('file-store', () => {
     });
 
     it('should remove expired sessions', async () => {
-      const { writeStore, getSessions } = await import('../src/store/file-store.js');
+      const { writeStore, cleanupStaleSessions, getSessions } = await import(
+        '../src/store/file-store.js'
+      );
       const now = Date.now();
       const thirtyOneMinutesAgo = now - 31 * 60 * 1000;
 
@@ -370,14 +372,17 @@ describe('file-store', () => {
         updated_at: new Date().toISOString(),
       });
 
-      const sessions = await getSessions();
+      await cleanupStaleSessions();
+      const sessions = getSessions();
 
       expect(sessions).toHaveLength(1);
       expect(sessions[0].session_id).toBe('active');
     });
 
     it('should remove sessions with closed TTY', async () => {
-      const { writeStore, getSessions } = await import('../src/store/file-store.js');
+      const { writeStore, cleanupStaleSessions, getSessions } = await import(
+        '../src/store/file-store.js'
+      );
       const now = Date.now();
 
       // Only /dev/pts/2 is alive
@@ -405,7 +410,8 @@ describe('file-store', () => {
         updated_at: new Date().toISOString(),
       });
 
-      const sessions = await getSessions();
+      await cleanupStaleSessions();
+      const sessions = getSessions();
 
       expect(sessions).toHaveLength(1);
       expect(sessions[0].session_id).toBe('aliveTty');

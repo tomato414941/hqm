@@ -31,6 +31,7 @@ import {
   getProjectsFromStore,
 } from './project-store.js';
 import {
+  cleanupStaleSessionsInStore,
   clearSessionsFromStore,
   getSessionFromStore,
   getSessionsFromStore,
@@ -39,6 +40,7 @@ import {
   updateSessionLastMessageInStore,
   updateSessionSummaryInStore,
 } from './session-store.js';
+import { syncTranscripts } from './transcript-sync.js';
 import { getCachedStore, initWriteCache, scheduleWrite } from './write-cache.js';
 
 // Re-export for backward compatibility
@@ -401,9 +403,18 @@ export function updateSession(event: HookEvent): Session {
   return updateSessionInStore(store, event, writeStore);
 }
 
-export async function getSessions(): Promise<Session[]> {
+export function getSessions(): Session[] {
   const store = readStore();
-  return getSessionsFromStore(store, writeStore);
+  const sessions = getSessionsFromStore(store);
+  if (syncTranscripts(sessions, store)) {
+    writeStore(store);
+  }
+  return sessions;
+}
+
+export async function cleanupStaleSessions(): Promise<void> {
+  const store = readStore();
+  await cleanupStaleSessionsInStore(store, writeStore);
 }
 
 export function getSession(sessionId: string): Session | undefined {

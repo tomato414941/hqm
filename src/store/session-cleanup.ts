@@ -23,6 +23,11 @@ export async function checkSessionsForCleanup(
 
   return Promise.all(
     entries.map(async ([key, session]): Promise<CleanupResult> => {
+      // tmux sessions are managed by syncTmuxSessionsOnce (removed when pane disappears)
+      if (session.source === 'tmux') {
+        return { key, session, shouldRemove: false, reason: null };
+      }
+
       const lastUpdateMs = parseISOTimestamp(session.updated_at);
 
       // Skip sessions with invalid timestamps (don't delete them)

@@ -3,9 +3,11 @@ import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import type { WebSocketServer } from 'ws';
 import { startCodexWatcher } from '../codex/ingest.js';
-import { TMUX_REFRESH_INTERVAL_MS } from '../constants.js';
+import { SESSION_REFRESH_INTERVAL_MS, TMUX_REFRESH_INTERVAL_MS } from '../constants.js';
 import { generateSessionSummaryIfNeeded } from '../services/summary.js';
+import { getSessionTimeoutMs } from '../store/config.js';
 import {
+  cleanupStaleSessions,
   getProjects,
   getSessions,
   getStorePath,
@@ -29,46 +31,42 @@ export function createFileWatcher(wss: WebSocketServer): FSWatcher {
   });
 
   const handleChange = () => {
-    void (async () => {
-      const sessions = await getSessions();
-      const projects = getProjects();
-      broadcastToClients(wss, { type: 'sessions', data: sessions, projects });
+    const sessions = getSessions();
+    const projects = getProjects();
+    broadcastToClients(wss, { type: 'sessions', data: sessions, projects });
 
-      // Clean up stale entries from generatingSummaries
-      const activeSessionIds = new Set(sessions.map((s) => s.session_id));
-      for (const id of generatingSummaries) {
-        if (!activeSessionIds.has(id)) {
-          generatingSummaries.delete(id);
-        }
+    // Clean up stale entries from generatingSummaries
+    const activeSessionIds = new Set(sessions.map((s) => s.session_id));
+    for (const id of generatingSummaries) {
+      if (!activeSessionIds.has(id)) {
+        generatingSummaries.delete(id);
       }
+    }
 
-      // Generate summaries for sessions that need it (in background)
-      for (const session of sessions) {
-        if (session.needs_summary) {
-          if (generatingSummaries.has(session.session_id)) {
-            continue; // Already generating
-          }
-          generatingSummaries.add(session.session_id);
-          generateSessionSummaryIfNeeded(session)
-            .then((summary) => {
-              if (summary) {
-                // Re-broadcast with updated summary
-                void getSessions().then((updated) => {
-                  const updatedProjects = getProjects();
-                  broadcastToClients(wss, {
-                    type: 'sessions',
-                    data: updated,
-                    projects: updatedProjects,
-                  });
-                });
-              }
-            })
-            .finally(() => {
-              generatingSummaries.delete(session.session_id);
-            });
+    // Generate summaries for sessions that need it (in background)
+    for (const session of sessions) {
+      if (session.needs_summary) {
+        if (generatingSummaries.has(session.session_id)) {
+          continue; // Already generating
         }
+        generatingSummaries.add(session.session_id);
+        generateSessionSummaryIfNeeded(session)
+          .then((summary) => {
+            if (summary) {
+              const updated = getSessions();
+              const updatedProjects = getProjects();
+              broadcastToClients(wss, {
+                type: 'sessions',
+                data: updated,
+                projects: updatedProjects,
+              });
+            }
+          })
+          .finally(() => {
+            generatingSummaries.delete(session.session_id);
+          });
       }
-    })();
+    }
   };
 
   watcher.on('change', (filePath) => {
@@ -79,9 +77,16 @@ export function createFileWatcher(wss: WebSocketServer): FSWatcher {
   });
 
   const tmuxInterval = setInterval(syncTmuxSessionsIfNeeded, TMUX_REFRESH_INTERVAL_MS);
+
+  // Periodic cleanup for timeout detection
+  const timeoutMs = getSessionTimeoutMs();
+  const cleanupInterval =
+    timeoutMs > 0 ? setInterval(cleanupStaleSessions, SESSION_REFRESH_INTERVAL_MS) : undefined;
+
   const originalClose = watcher.close.bind(watcher);
   watcher.close = () => {
     clearInterval(tmuxInterval);
+    if (cleanupInterval) clearInterval(cleanupInterval);
     return originalClose();
   };
 

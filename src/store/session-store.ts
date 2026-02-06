@@ -17,7 +17,6 @@ import {
 } from './display-order.js';
 import { getFieldUpdates } from './event-handlers.js';
 import { checkSessionsForCleanup } from './session-cleanup.js';
-import { syncTranscripts } from './transcript-sync.js';
 
 const STORE_DIR = join(homedir(), '.hqm');
 const LOG_FILE = join(STORE_DIR, 'deletion.log');
@@ -146,39 +145,11 @@ export function updateSessionInStore(
 }
 
 /**
- * Get all sessions from the store with cleanup and sorting
+ * Get all sessions from the store sorted by displayOrder (pure read, no side effects)
  */
-export async function getSessionsFromStore(
-  store: StoreData,
-  writeStore: (data: StoreData) => void
-): Promise<Session[]> {
+export function getSessionsFromStore(store: StoreData): Session[] {
   const span = startPerf('getSessions');
-  const timeoutMs = getSessionTimeoutMs();
   const entries = Object.entries(store.sessions);
-
-  // Check sessions for cleanup
-  const cleanupResults = await checkSessionsForCleanup(store, timeoutMs);
-
-  let hasChanges = false;
-  let removedCount = 0;
-  for (const { key, session, shouldRemove, reason, elapsed } of cleanupResults) {
-    if (shouldRemove) {
-      removedCount += 1;
-      if (reason === 'tty_closed') {
-        logDeletion(session, 'tty_closed', { tty: session.tty });
-      } else if (reason === 'timeout') {
-        logDeletion(session, 'timeout', { elapsed });
-      }
-      delete store.sessions[key];
-      // Remove from displayOrder immediately to prevent stale entries
-      removeSessionFromDisplayOrder(store, key);
-      hasChanges = true;
-    }
-  }
-
-  if (hasChanges) {
-    writeStore(store);
-  }
 
   // Sort sessions by displayOrder
   const displayOrder = store.displayOrder || [];
@@ -190,7 +161,7 @@ export async function getSessionsFromStore(
     }
   }
 
-  const result = Object.entries(store.sessions)
+  const result = entries
     .map(([key, session]) => ({ key, session }))
     .sort((a, b) => {
       const aOrder = sessionKeyOrder.get(a.key) ?? Number.MAX_SAFE_INTEGER;
@@ -205,19 +176,40 @@ export async function getSessionsFromStore(
     })
     .map(({ session }) => session);
 
-  // Sync lastMessage from transcripts
-  if (syncTranscripts(result, store)) {
-    writeStore(store);
-  }
-
   endPerf(span, {
     session_count: entries.length,
-    removed_count: removedCount,
     remaining_count: result.length,
-    timeout_ms: timeoutMs,
-    tty_checks: entries.length,
   });
   return result;
+}
+
+/**
+ * Cleanup stale sessions (TTY closed or timeout) — extracted from getSessionsFromStore
+ */
+export async function cleanupStaleSessionsInStore(
+  store: StoreData,
+  writeStore: (data: StoreData) => void
+): Promise<void> {
+  const timeoutMs = getSessionTimeoutMs();
+  const cleanupResults = await checkSessionsForCleanup(store, timeoutMs);
+
+  let hasChanges = false;
+  for (const { key, session, shouldRemove, reason, elapsed } of cleanupResults) {
+    if (shouldRemove) {
+      if (reason === 'tty_closed') {
+        logDeletion(session, 'tty_closed', { tty: session.tty });
+      } else if (reason === 'timeout') {
+        logDeletion(session, 'timeout', { elapsed });
+      }
+      delete store.sessions[key];
+      removeSessionFromDisplayOrder(store, key);
+      hasChanges = true;
+    }
+  }
+
+  if (hasChanges) {
+    writeStore(store);
+  }
 }
 
 /**

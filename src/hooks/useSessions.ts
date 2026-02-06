@@ -10,6 +10,7 @@ import {
 import { generateSessionSummaryIfNeeded } from '../services/summary.js';
 import { getSessionTimeoutMs } from '../store/config.js';
 import {
+  cleanupStaleSessions,
   getProjects,
   getSessions,
   getStorePath,
@@ -33,9 +34,9 @@ export function useSessions(): {
   const [error, setError] = useState<Error | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const loadSessions = useCallback(async () => {
+  const loadSessions = useCallback(() => {
     try {
-      const data = await getSessions();
+      const data = getSessions();
       const projectData = getProjects();
       setSessions(data);
       setProjects(projectData);
@@ -59,8 +60,7 @@ export function useSessions(): {
           generateSessionSummaryIfNeeded(session)
             .then((summary) => {
               if (summary) {
-                // Trigger re-render with updated sessions
-                getSessions().then(setSessions);
+                setSessions(getSessions());
               }
             })
             .finally(() => {
@@ -109,11 +109,12 @@ export function useSessions(): {
       if (basename(filePath) === storeBasename) debouncedLoadSessions();
     });
 
-    // Periodic refresh for timeout detection (only if timeout is enabled)
+    // Periodic cleanup for timeout detection (only if timeout is enabled)
+    // cleanup → writeStore → chokidar detects change → debouncedLoadSessions fires
     const timeoutMs = getSessionTimeoutMs();
     let interval: ReturnType<typeof setInterval> | undefined;
     if (timeoutMs > 0) {
-      interval = setInterval(loadSessions, SESSION_REFRESH_INTERVAL_MS);
+      interval = setInterval(cleanupStaleSessions, SESSION_REFRESH_INTERVAL_MS);
     }
 
     const tmuxInterval = setInterval(syncTmuxSessionsIfNeeded, TMUX_REFRESH_INTERVAL_MS);
