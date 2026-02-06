@@ -78,3 +78,6 @@ export const MAX_SEND_TEXT_LENGTH = 10_000;
 
 /** Session registry cache TTL in milliseconds (30 seconds) */
 export const SESSION_REGISTRY_CACHE_TTL_MS = 30_000;
+
+/** Unix domain socket filename for daemon IPC */
+export const DAEMON_SOCKET_FILENAME = 'hqm.sock';

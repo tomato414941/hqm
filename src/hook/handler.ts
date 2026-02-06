@@ -1,3 +1,4 @@
+import { isDaemonRunning, sendToDaemon } from '../server/daemon-client.js';
 import { flushPendingWrites, updateSession } from '../store/file-store.js';
 import type { HookEvent } from '../types/index.js';
 import { endPerf, startPerf } from '../utils/perf.js';
@@ -56,9 +57,20 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
     source: hookPayload.source as HookEvent['source'],
   };
 
-  updateSession(event);
+  // Prefer sending to daemon via socket (single writer) with fallback to direct write
+  if (isDaemonRunning()) {
+    try {
+      const response = await sendToDaemon({ type: 'hookEvent', payload: event });
+      if (response.ok) {
+        endPerf(span, { bytes: inputJson.length, via: 'daemon' });
+        return;
+      }
+    } catch {
+      // Daemon unreachable - fall through to direct write
+    }
+  }
 
-  // Ensure data is written before process exits (hooks are short-lived processes)
+  updateSession(event);
   await flushPendingWrites();
-  endPerf(span, { bytes: inputJson.length });
+  endPerf(span, { bytes: inputJson.length, via: 'direct' });
 }

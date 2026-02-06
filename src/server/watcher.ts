@@ -1,3 +1,4 @@
+import { basename, dirname } from 'node:path';
 import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import type { WebSocketServer } from 'ws';
@@ -21,15 +22,13 @@ export function createFileWatcher(wss: WebSocketServer): FSWatcher {
   syncTmuxSessionsOnce();
 
   const storePath = getStorePath();
-  const watcher = chokidar.watch(storePath, {
+  const storeBasename = basename(storePath);
+  const watcher = chokidar.watch(dirname(storePath), {
     ignoreInitial: true,
-    awaitWriteFinish: {
-      stabilityThreshold: 100,
-      pollInterval: 50,
-    },
+    depth: 0,
   });
 
-  watcher.on('change', () => {
+  const handleChange = () => {
     void (async () => {
       const sessions = await getSessions();
       const projects = getProjects();
@@ -70,6 +69,13 @@ export function createFileWatcher(wss: WebSocketServer): FSWatcher {
         }
       }
     })();
+  };
+
+  watcher.on('change', (filePath) => {
+    if (basename(filePath) === storeBasename) handleChange();
+  });
+  watcher.on('add', (filePath) => {
+    if (basename(filePath) === storeBasename) handleChange();
   });
 
   const tmuxInterval = setInterval(syncTmuxSessionsIfNeeded, TMUX_REFRESH_INTERVAL_MS);

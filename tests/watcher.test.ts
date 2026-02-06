@@ -80,8 +80,8 @@ describe('watcher', () => {
       const changeHandler = mockWatcher.on.mock.calls.find((call) => call[0] === 'change')?.[1];
       expect(changeHandler).toBeDefined();
 
-      // Trigger change
-      await changeHandler();
+      // Trigger change with matching filename
+      await changeHandler('/tmp/sessions.json');
 
       // Wait for async operations
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -115,7 +115,7 @@ describe('watcher', () => {
 
       const changeHandler = mockWatcher.on.mock.calls.find((call) => call[0] === 'change')?.[1];
 
-      await changeHandler();
+      await changeHandler('/tmp/sessions.json');
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(mockGenerateSummary).toHaveBeenCalledWith(sessions[0]);
@@ -143,7 +143,7 @@ describe('watcher', () => {
 
       const changeHandler = mockWatcher.on.mock.calls.find((call) => call[0] === 'change')?.[1];
 
-      await changeHandler();
+      await changeHandler('/tmp/sessions.json');
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(mockGenerateSummary).not.toHaveBeenCalled();
@@ -169,7 +169,7 @@ describe('watcher', () => {
 
       const changeHandler = mockWatcher.on.mock.calls.find((call) => call[0] === 'change')?.[1];
 
-      await changeHandler();
+      await changeHandler('/tmp/sessions.json');
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(mockGenerateSummary).not.toHaveBeenCalled();

@@ -1,3 +1,4 @@
+import { basename, dirname } from 'node:path';
 import chokidar from 'chokidar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { startCodexWatcher } from '../codex/ingest.js';
@@ -93,18 +94,20 @@ export function useSessions(): {
 
     // Watch file changes (debounced)
     const storePath = getStorePath();
-    const watcher = chokidar.watch(storePath, {
+    const storeBasename = basename(storePath);
+    const watcher = chokidar.watch(dirname(storePath), {
       persistent: true,
       ignoreInitial: true,
       usePolling: false, // Use native inotify on Linux instead of polling
-      awaitWriteFinish: {
-        stabilityThreshold: 100,
-        pollInterval: 50,
-      },
+      depth: 0,
     });
 
-    watcher.on('change', debouncedLoadSessions);
-    watcher.on('add', debouncedLoadSessions);
+    watcher.on('change', (filePath) => {
+      if (basename(filePath) === storeBasename) debouncedLoadSessions();
+    });
+    watcher.on('add', (filePath) => {
+      if (basename(filePath) === storeBasename) debouncedLoadSessions();
+    });
 
     // Periodic refresh for timeout detection (only if timeout is enabled)
     const timeoutMs = getSessionTimeoutMs();

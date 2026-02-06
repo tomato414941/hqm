@@ -13,6 +13,12 @@ vi.mock('../src/store/file-store.js', () => ({
   flushPendingWrites: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Mock daemon-client (default: daemon not running, falls back to direct write)
+vi.mock('../src/server/daemon-client.js', () => ({
+  isDaemonRunning: vi.fn().mockReturnValue(false),
+  sendToDaemon: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
 describe('handler', () => {
   describe('VALID_HOOK_EVENTS', () => {
     it('should contain all expected hook event names', () => {
@@ -311,6 +317,59 @@ describe('handler', () => {
           tty: '/dev/tty1',
           hook_event_name: 'PostToolUse',
         })
+      );
+    });
+
+    it('should send via daemon when running', async () => {
+      const { isDaemonRunning, sendToDaemon } = await import('../src/server/daemon-client.js');
+      const { updateSession } = await import('../src/store/file-store.js');
+
+      vi.mocked(isDaemonRunning).mockReturnValue(true);
+      vi.mocked(sendToDaemon).mockResolvedValue({ ok: true });
+
+      const mockStdin = createMockStdin(
+        JSON.stringify({
+          session_id: 'test-daemon',
+          cwd: '/tmp',
+        })
+      );
+      Object.defineProperty(process, 'stdin', {
+        value: mockStdin,
+        writable: true,
+        configurable: true,
+      });
+
+      await handleHookEvent('PreToolUse');
+
+      expect(sendToDaemon).toHaveBeenCalledWith(expect.objectContaining({ type: 'hookEvent' }));
+      // Should NOT call updateSession directly when daemon succeeds
+      expect(updateSession).not.toHaveBeenCalled();
+    });
+
+    it('should fallback to direct write when daemon fails', async () => {
+      const { isDaemonRunning, sendToDaemon } = await import('../src/server/daemon-client.js');
+      const { updateSession } = await import('../src/store/file-store.js');
+
+      vi.mocked(isDaemonRunning).mockReturnValue(true);
+      vi.mocked(sendToDaemon).mockRejectedValue(new Error('connection refused'));
+
+      const mockStdin = createMockStdin(
+        JSON.stringify({
+          session_id: 'test-fallback',
+          cwd: '/tmp',
+        })
+      );
+      Object.defineProperty(process, 'stdin', {
+        value: mockStdin,
+        writable: true,
+        configurable: true,
+      });
+
+      await handleHookEvent('PreToolUse');
+
+      // Should fallback to direct write
+      expect(updateSession).toHaveBeenCalledWith(
+        expect.objectContaining({ session_id: 'test-fallback' })
       );
     });
   });

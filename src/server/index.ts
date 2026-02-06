@@ -4,6 +4,7 @@ import qrcode from 'qrcode-terminal';
 import { WebSocketServer } from 'ws';
 import { serverLog } from '../utils/debug.js';
 import { generateAuthToken } from './auth.js';
+import { startDaemonSocket, stopDaemonSocket } from './daemon-socket.js';
 import { DEFAULT_PORT, findAvailablePort, isPortAvailable } from './port.js';
 import { isDangerousCommand } from './security.js';
 import { getContentType, serveStatic } from './static.js';
@@ -90,6 +91,8 @@ export async function createMobileServer(port = DEFAULT_PORT): Promise<ServerInf
 
   const components = createServerComponents(token);
 
+  startDaemonSocket();
+
   await new Promise<void>((resolve) => {
     components.server.listen(actualPort, '0.0.0.0', resolve);
   });
@@ -99,7 +102,10 @@ export async function createMobileServer(port = DEFAULT_PORT): Promise<ServerInf
     qrCode,
     token,
     port: actualPort,
-    stop: () => stopServerComponents(components),
+    stop: () => {
+      stopServerComponents(components);
+      void stopDaemonSocket();
+    },
   };
 }
 
@@ -110,6 +116,8 @@ export async function startServer(port = DEFAULT_PORT): Promise<void> {
   const url = `http://${localIP}:${actualPort}?token=${token}`;
 
   const components = createServerComponents(token);
+
+  startDaemonSocket();
 
   components.server.listen(actualPort, '0.0.0.0', () => {
     serverLog('STARTUP', `Server listening on ${localIP}:${actualPort}`);
@@ -131,6 +139,7 @@ export async function startServer(port = DEFAULT_PORT): Promise<void> {
     serverLog('SHUTDOWN', `Server stopped (signal: ${signal})`);
     console.log('\n  Shutting down...');
     stopServerComponents(components);
+    void stopDaemonSocket();
     process.exit(0);
   };
 

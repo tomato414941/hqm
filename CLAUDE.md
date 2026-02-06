@@ -76,21 +76,9 @@ Config is stored in `~/.hqm/config.json`.
 - Tests in `tests/` directory using Vitest
 - React components use `.tsx`, utilities use `.ts`
 
-## Known Issues / Future Improvements
+## Design Notes
 
-### Path truncation in SessionCard
-- **Location**: SessionCard.tsx:51
-- **Issue**: `dir` variable has no length limit, long paths can break layout
-- **Solution**: Apply `truncateText(abbreviateHomePath(session.cwd), 40)`
-
-### Project list j/k reorder logic improvement
-- **Current**: `handleReorderProject()` explicitly updates index (Dashboard.tsx:362-375)
-- **Issue**: Cursor moves first, then project moves ~0.5s later (timing mismatch)
-- **Improvement**: Unify with session list approach
-  - Keep `selectedProjectId` (key) and recalculate index
-  - Session list keeps `selectedSessionKey` and recalculates `selectedIndex` via useMemo
-
-### Session clear loses project association
-- **Current**: `clearSessions` removes all session items from displayOrder
-- **Issue**: New sessions are always added to "ungrouped" after clear
-- **Design**: `assignedCwds` auto-assignment was removed (caused mis-grouping with broad paths like `/home/dev`). New sessions always go to ungrouped; users assign manually. TTY inheritance is preserved.
+### Session clear and project association
+- `clearSessions` removes all session items from displayOrder
+- New sessions are always added to "ungrouped" after clear
+- `assignedCwds` auto-assignment was removed (caused mis-grouping with broad paths like `/home/dev`). New sessions always go to ungrouped; users assign manually. TTY inheritance is preserved.

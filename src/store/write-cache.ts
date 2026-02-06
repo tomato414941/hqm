@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { WRITE_DEBOUNCE_MS } from '../constants.js';
 import type { StoreData } from '../types/index.js';
 
@@ -48,7 +48,9 @@ export class WriteCache {
       try {
         this.ensureStoreDir();
         data.updated_at = new Date().toISOString();
-        writeFileSync(this.storeFile, JSON.stringify(data), { encoding: 'utf-8', mode: 0o600 });
+        const tmpFile = `${this.storeFile}.tmp.${process.pid}`;
+        writeFileSync(tmpFile, JSON.stringify(data), { encoding: 'utf-8', mode: 0o600 });
+        renameSync(tmpFile, this.storeFile);
         return true;
       } catch (error) {
         this.logWriteError(error, attempt);
