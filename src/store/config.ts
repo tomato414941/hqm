@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { ensureDir, readJsonFile, writeJsonFile } from '../utils/file-io.js';
+import type { LogLevel } from '../utils/logger.js';
 
 const CONFIG_DIR = join(homedir(), '.hqm');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
@@ -14,6 +15,7 @@ export interface HqmConfig {
    * 0 = no timeout (sessions persist until manually deleted or TTY closes)
    */
   sessionTimeoutMinutes: number;
+  logLevel: LogLevel;
 }
 
 /**
@@ -21,6 +23,7 @@ export interface HqmConfig {
  */
 const DEFAULT_CONFIG: HqmConfig = {
   sessionTimeoutMinutes: 0,
+  logLevel: 'info',
 };
 
 /**
@@ -67,4 +70,9 @@ export function setSessionTimeout(minutes: number): void {
  */
 export function getConfigPath(): string {
   return CONFIG_FILE;
+}
+
+export function getLogLevel(): LogLevel {
+  const config = readConfig();
+  return config.logLevel;
 }
