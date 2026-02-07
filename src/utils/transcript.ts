@@ -262,7 +262,11 @@ export function getAllMessages(
     logParseErrors(parseErrors, transcriptPath);
 
     return collector.getResult(options);
-  } catch {
+  } catch (e) {
+    logger.warn('Transcript read error', {
+      path: transcriptPath,
+      error: e instanceof Error ? e.message : 'unknown',
+    });
     return { messages: [], hasMore: false };
   }
 }
@@ -326,8 +330,11 @@ export function getLastAssistantMessage(transcriptPath: string): string | undefi
         // Skip invalid JSON lines
       }
     }
-  } catch {
-    // File read error
+  } catch (e) {
+    logger.warn('Transcript read error', {
+      path: transcriptPath,
+      error: e instanceof Error ? e.message : 'unknown',
+    });
   }
 
   return undefined;
@@ -374,7 +381,11 @@ export async function getAllMessagesAsync(
     logParseErrors(parseErrors, transcriptPath);
 
     return collector.getResult(options);
-  } catch {
+  } catch (e) {
+    logger.warn('Transcript async read error', {
+      path: transcriptPath,
+      error: e instanceof Error ? e.message : 'unknown',
+    });
     return { messages: [], hasMore: false };
   }
 }

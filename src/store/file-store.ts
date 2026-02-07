@@ -181,6 +181,7 @@ export function readStore(): StoreData {
     migrateRemoveAssignedCwds(parsed);
     return parsed;
   } catch {
+    logger.warn('Failed to parse sessions.json');
     return getEmptyStoreData();
   }
 }

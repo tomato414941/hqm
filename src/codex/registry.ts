@@ -62,7 +62,7 @@ export function refreshCodexRegistry(): void {
         nextRegistry.set(sessionId, { path: filePath, mtimeMs });
       }
     } catch {
-      // Skip unreadable files
+      logger.warn('Failed to stat codex file', { path: filePath });
     }
   }
 

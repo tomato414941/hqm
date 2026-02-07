@@ -142,7 +142,8 @@ function parseCodexEntry(line: string): Record<string, unknown> | undefined {
       return undefined;
     }
     return parsed;
-  } catch {
+  } catch (e) {
+    logger.warn('Codex entry parse error', { error: e instanceof Error ? e.message : 'unknown' });
     return undefined;
   }
 }
@@ -305,7 +306,11 @@ export function syncCodexSessionsOnce(): void {
         if (now - mtimeMs > activeWindowMs) {
           continue;
         }
-      } catch {
+      } catch (e) {
+        logger.warn('Codex stat error', {
+          path: filePath,
+          error: e instanceof Error ? e.message : 'unknown',
+        });
         continue;
       }
     }
