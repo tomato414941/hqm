@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import qrcode from 'qrcode-terminal';
 import { WebSocketServer } from 'ws';
-import { serverLog } from '../utils/debug.js';
+import { logger } from '../utils/logger.js';
 import { generateAuthToken } from './auth.js';
 import { startDaemonSocket, stopDaemonSocket } from './daemon-socket.js';
 import { DEFAULT_PORT, findAvailablePort, isPortAvailable } from './port.js';
@@ -120,9 +120,9 @@ export async function startServer(port = DEFAULT_PORT): Promise<void> {
   startDaemonSocket();
 
   components.server.listen(actualPort, '0.0.0.0', () => {
-    serverLog('STARTUP', `Server listening on ${localIP}:${actualPort}`);
+    logger.info(`Server listening on ${localIP}:${actualPort}`);
     if (actualPort !== port) {
-      serverLog('STARTUP', `Port ${port} unavailable, using ${actualPort}`);
+      logger.info(`Port ${port} unavailable, using ${actualPort}`);
     }
 
     console.log('\n  HQM - Mobile Web Interface\n');
@@ -136,7 +136,8 @@ export async function startServer(port = DEFAULT_PORT): Promise<void> {
   });
 
   const shutdown = (signal: string) => {
-    serverLog('SHUTDOWN', `Server stopped (signal: ${signal})`);
+    logger.info(`Server stopped (signal: ${signal})`);
+    logger.flush();
     console.log('\n  Shutting down...');
     stopServerComponents(components);
     void stopDaemonSocket();

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { isCodexSessionId } from '../codex/paths.js';
 import { TMUX_INFERENCE_WINDOW_MS } from '../constants.js';
 import type { DisplayOrderItem, HookEvent, Project, Session, StoreData } from '../types/index.js';
-import { debugLog } from '../utils/debug.js';
+import { logger } from '../utils/logger.js';
 import { parseISOTimestamp } from '../utils/time.js';
 import { listTmuxPanesDetails, type TmuxPaneDetails } from '../utils/tmux.js';
 import { isValidStoreData } from '../utils/type-guards.js';
@@ -374,9 +374,7 @@ export function syncTmuxSessionsOnce(): void {
   })();
 
   if (logEnabled || hasChanges) {
-    debugLog(
-      `tmux-sync panes=${stats.panes} agent_panes=${stats.agentPanes} hook_sessions=${stats.hookSessions} matched=${stats.matched} updated=${stats.updatedExisting} created_tmux=${stats.createdTmux} removed_tmux=${stats.removedTmux} skipped_tty=${stats.skippedTty}`
-    );
+    logger.debug('tmux-sync', stats);
   }
 
   if (hasChanges) {

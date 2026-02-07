@@ -5,7 +5,7 @@ import chokidar from 'chokidar';
 import { getSessionTimeoutMs } from '../store/config.js';
 import { updateSession, updateSessionLastMessage } from '../store/file-store.js';
 import type { HookEvent } from '../types/index.js';
-import { debugLog } from '../utils/debug.js';
+import { logger } from '../utils/logger.js';
 import { isObject } from '../utils/type-guards.js';
 import {
   encodeCodexSessionId,
@@ -97,7 +97,7 @@ function readNewLines(filePath: string, state: CodexFileState): string[] {
     state.remainder = lines.pop() ?? '';
     return lines.filter((line) => line.trim().length > 0);
   } catch (e) {
-    debugLog(`Codex read failed: ${e instanceof Error ? e.message : 'unknown'}`);
+    logger.warn('Codex read failed', { error: e instanceof Error ? e.message : 'unknown' });
     return [];
   }
 }

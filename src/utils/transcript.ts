@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline';
 import { isCodexSessionId } from '../codex/paths.js';
 import { getCodexTranscriptPath } from '../codex/registry.js';
 import type { ConversationMessage } from '../types/index.js';
-import { debugLog } from './debug.js';
+import { logger } from './logger.js';
 import { getTranscriptPathFromRegistry } from './session-registry.js';
 
 /**
@@ -226,7 +226,7 @@ function extractCodexMessage(entry: CodexEntry, index: number): ConversationMess
 
 function logParseErrors(parseErrors: number, transcriptPath: string): void {
   if (parseErrors > 3) {
-    debugLog(`transcript parse errors: ${parseErrors} total in ${transcriptPath}`);
+    logger.warn('transcript parse errors', { count: parseErrors, path: transcriptPath });
   }
 }
 
@@ -252,9 +252,10 @@ export function getAllMessages(
       } catch (e) {
         parseErrors++;
         if (parseErrors <= 3) {
-          debugLog(
-            `transcript parse error in ${transcriptPath}: ${e instanceof Error ? e.message : 'unknown'}`
-          );
+          logger.warn('transcript parse error', {
+            path: transcriptPath,
+            error: e instanceof Error ? e.message : 'unknown',
+          });
         }
       }
     }
@@ -363,9 +364,10 @@ export async function getAllMessagesAsync(
       } catch (e) {
         parseErrors++;
         if (parseErrors <= 3) {
-          debugLog(
-            `transcript parse error in ${transcriptPath}: ${e instanceof Error ? e.message : 'unknown'}`
-          );
+          logger.warn('transcript parse error', {
+            path: transcriptPath,
+            error: e instanceof Error ? e.message : 'unknown',
+          });
         }
       }
     }

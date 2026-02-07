@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { SESSION_REGISTRY_CACHE_TTL_MS } from '../constants.js';
-import { debugLog } from './debug.js';
+import { logger } from './logger.js';
 
 interface SessionIndexEntry {
   sessionId: string;
@@ -30,7 +30,7 @@ function parseSessionsIndex(filePath: string): SessionsIndex | null {
       return data;
     }
   } catch {
-    debugLog(`Failed to parse sessions-index: ${filePath}`);
+    logger.warn('Failed to parse sessions-index', { path: filePath });
   }
   return null;
 }
@@ -66,12 +66,14 @@ export function refreshSessionRegistry(): void {
       }
     }
   } catch (e) {
-    debugLog(`Failed to scan projects dir: ${e instanceof Error ? e.message : 'unknown'}`);
+    logger.warn('Failed to scan projects dir', {
+      error: e instanceof Error ? e.message : 'unknown',
+    });
   }
 
   registry = newRegistry;
   lastRefresh = Date.now();
-  debugLog(`Session registry refreshed: ${registry.size} sessions`);
+  logger.debug('Session registry refreshed', { size: registry.size });
 }
 
 /**

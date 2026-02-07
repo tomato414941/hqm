@@ -6,8 +6,14 @@ vi.mock('../src/store/file-store.js', () => ({
   getProjects: vi.fn().mockReturnValue([]),
 }));
 
-vi.mock('../src/utils/debug.js', () => ({
-  serverLog: vi.fn(),
+vi.mock('../src/utils/logger.js', () => ({
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    flush: vi.fn(),
+  },
 }));
 
 vi.mock('../src/server/handlers/focus.js', () => ({

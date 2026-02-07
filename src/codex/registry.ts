@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { debugLog } from '../utils/debug.js';
+import { logger } from '../utils/logger.js';
 import {
   decodeCodexSessionId,
   extractCodexSessionIdFromPath,
@@ -43,7 +43,9 @@ export function refreshCodexRegistry(): void {
   try {
     scanSessionsDir(sessionsDir, files);
   } catch (e) {
-    debugLog(`Codex registry scan failed: ${e instanceof Error ? e.message : 'unknown'}`);
+    logger.warn('Codex registry scan failed', {
+      error: e instanceof Error ? e.message : 'unknown',
+    });
     registry = new Map();
     lastRefresh = Date.now();
     return;
@@ -66,7 +68,7 @@ export function refreshCodexRegistry(): void {
 
   registry = nextRegistry;
   lastRefresh = Date.now();
-  debugLog(`Codex registry refreshed: ${registry.size} sessions`);
+  logger.debug('Codex registry refreshed', { size: registry.size });
 }
 
 export function getCodexTranscriptPath(sessionId: string): string | undefined {

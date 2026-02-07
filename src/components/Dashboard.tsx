@@ -26,8 +26,8 @@ import {
   reorderProject,
 } from '../store/file-store.js';
 import type { DisplayOrderItem, Project, Session } from '../types/index.js';
-import { debugLog } from '../utils/debug.js';
 import { createNewSession, focusSessionByContext } from '../utils/focus.js';
+import { logger } from '../utils/logger.js';
 import { getQrPanelMetrics, shouldShowQRCode } from '../utils/qr-display.js';
 import { ConfirmModal, ProjectAssignModal, ProjectManageModal } from './dashboard/index.js';
 import { SessionCard } from './SessionCard.js';
@@ -273,25 +273,25 @@ export function Dashboard({
     const pending = pendingAssignmentRef.current;
     if (!pending) return;
 
-    debugLog(
+    logger.debug(
       `pendingAssignment check: tty=${pending.tty}, projectId=${pending.projectId}, sessions.length=${sessions.length}`
     );
 
     // Check if timeout expired
     if (Date.now() - pending.createdAt > PENDING_ASSIGNMENT_TIMEOUT_MS) {
-      debugLog('pendingAssignment: timeout expired');
+      logger.debug('pendingAssignment: timeout expired');
       setPendingAssignment(null);
       return;
     }
 
     // Find session with matching TTY
     const matchingSession = sessions.find((s) => s.tty === pending.tty);
-    debugLog(
+    logger.debug(
       `pendingAssignment: matchingSession=${matchingSession ? matchingSession.session_id : 'not found'}`
     );
     if (matchingSession && pending.projectId) {
       const sessionKey = matchingSession.session_id;
-      debugLog(`pendingAssignment: assigning ${sessionKey} to project ${pending.projectId}`);
+      logger.debug(`pendingAssignment: assigning ${sessionKey} to project ${pending.projectId}`);
       assignSessionToProjectInOrder(sessionKey, pending.projectId);
       setPendingAssignment(null);
     }
@@ -426,16 +426,18 @@ export function Dashboard({
     const sessionKey = selectedSession ? selectedSession.session_id : undefined;
     const projectId = sessionKey ? getSessionProject(sessionKey) : undefined;
 
-    debugLog(
+    logger.debug(
       `handleNewSession: selectedIndex=${selectedIndex}, sessionKey=${sessionKey}, projectId=${projectId}`
     );
 
     const newTty = createNewSession();
-    debugLog(`handleNewSession: newTty=${newTty}`);
+    logger.debug(`handleNewSession: newTty=${newTty}`);
 
     if (newTty && projectId) {
       // Set up pending assignment for the new session
-      debugLog(`handleNewSession: setting pendingAssignment tty=${newTty}, projectId=${projectId}`);
+      logger.debug(
+        `handleNewSession: setting pendingAssignment tty=${newTty}, projectId=${projectId}`
+      );
       setPendingAssignment({
         tty: newTty,
         projectId,
@@ -593,10 +595,10 @@ export function Dashboard({
 
     // Normal mode
     if (input === 'q' || key.escape) {
-      debugLog(`'q' key pressed (input=${input}, escape=${key.escape})`);
-      debugLog('Calling exit()');
+      logger.debug(`'q' key pressed (input=${input}, escape=${key.escape})`);
+      logger.debug('Calling exit()');
       exit();
-      debugLog('exit() called, returning from useInput handler');
+      logger.debug('exit() called, returning from useInput handler');
       return;
     }
     if (key.upArrow) {

@@ -7,9 +7,15 @@ vi.mock('../src/utils/tty.js', () => ({
   isTtyAliveAsync: (tty: string | undefined) => mockIsTtyAlive(tty),
 }));
 
-// Mock debug log
-vi.mock('../src/utils/debug.js', () => ({
-  debugLog: vi.fn(),
+// Mock logger
+vi.mock('../src/utils/logger.js', () => ({
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    flush: vi.fn(),
+  },
 }));
 
 describe('session-cleanup', () => {
@@ -76,7 +82,7 @@ describe('session-cleanup', () => {
 
     it('should handle sessions with invalid timestamps', async () => {
       const { checkSessionsForCleanup } = await import('../src/store/session-cleanup.js');
-      const { debugLog } = await import('../src/utils/debug.js');
+      const { logger } = await import('../src/utils/logger.js');
 
       const session = createSession({
         session_id: 'invalid-ts-session',
@@ -89,8 +95,9 @@ describe('session-cleanup', () => {
       expect(results).toHaveLength(1);
       expect(results[0].shouldRemove).toBe(false);
       expect(results[0].reason).toBe(null);
-      expect(debugLog).toHaveBeenCalledWith(
-        expect.stringContaining('Invalid timestamp for session invalid-ts-session')
+      expect(logger.warn).toHaveBeenCalledWith(
+        'Invalid timestamp for session',
+        expect.objectContaining({ session_id: 'invalid-ts-session' })
       );
     });
 

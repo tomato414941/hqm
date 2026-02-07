@@ -1,6 +1,7 @@
 import { isDaemonRunning, sendToDaemon } from '../server/daemon-client.js';
 import { flushPendingWrites, updateSession } from '../store/file-store.js';
 import type { HookEvent } from '../types/index.js';
+import { logger } from '../utils/logger.js';
 import { endPerf, startPerf } from '../utils/perf.js';
 import { isNonEmptyString, isValidHookEventName, VALID_HOOK_EVENTS } from '../utils/type-guards.js';
 
@@ -63,6 +64,7 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
       const response = await sendToDaemon({ type: 'hookEvent', payload: event });
       if (response.ok) {
         endPerf(span, { bytes: inputJson.length, via: 'daemon' });
+        logger.flush();
         return;
       }
     } catch {
@@ -73,4 +75,5 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
   updateSession(event);
   await flushPendingWrites();
   endPerf(span, { bytes: inputJson.length, via: 'direct' });
+  logger.flush();
 }

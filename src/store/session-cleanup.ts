@@ -1,5 +1,5 @@
 import type { Session, StoreData } from '../types/index.js';
-import { debugLog } from '../utils/debug.js';
+import { logger } from '../utils/logger.js';
 import { parseISOTimestamp } from '../utils/time.js';
 import { isTtyAliveAsync } from '../utils/tty.js';
 
@@ -32,7 +32,10 @@ export async function checkSessionsForCleanup(
 
       // Skip sessions with invalid timestamps (don't delete them)
       if (lastUpdateMs === null) {
-        debugLog(`Invalid timestamp for session ${session.session_id}: ${session.updated_at}`);
+        logger.warn('Invalid timestamp for session', {
+          session_id: session.session_id,
+          updated_at: session.updated_at,
+        });
         return { key, session, shouldRemove: false, reason: null };
       }
 

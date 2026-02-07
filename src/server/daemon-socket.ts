@@ -6,7 +6,7 @@ import { DAEMON_SOCKET_FILENAME } from '../constants.js';
 import { clearAll, clearProjects, clearSessions, updateSession } from '../store/file-store.js';
 import { flushPendingWrites } from '../store/write-cache.js';
 import type { HookEvent } from '../types/index.js';
-import { debugLog } from '../utils/debug.js';
+import { logger } from '../utils/logger.js';
 
 export interface DaemonRequest {
   type: 'hookEvent' | 'clearSessions' | 'clearAll' | 'clearProjects';
@@ -46,7 +46,7 @@ function handleRequest(request: DaemonRequest): DaemonResponse {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    debugLog(`daemon-socket handleRequest error: ${message}`);
+    logger.warn('daemon-socket handleRequest error', { error: message });
     return { ok: false, error: message };
   }
 }
@@ -96,14 +96,14 @@ export function startDaemonSocket(): void {
 
   server.on('error', (error: NodeJS.ErrnoException) => {
     if (error.code === 'EADDRINUSE') {
-      debugLog('daemon-socket: EADDRINUSE - another daemon may be running');
+      logger.warn('daemon-socket: EADDRINUSE - another daemon may be running');
     } else {
-      debugLog(`daemon-socket error: ${error.message}`);
+      logger.warn('daemon-socket error', { error: error.message });
     }
   });
 
   server.listen(SOCKET_PATH, () => {
-    debugLog(`daemon-socket listening on ${SOCKET_PATH}`);
+    logger.info('daemon-socket listening', { path: SOCKET_PATH });
   });
 }
 

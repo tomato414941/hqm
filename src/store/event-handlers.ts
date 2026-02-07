@@ -1,4 +1,5 @@
 import type { HookEvent, HookEventName } from '../types/index.js';
+import { logger } from '../utils/logger.js';
 
 export interface SessionFieldUpdates {
   lastPrompt?: string;
@@ -17,9 +18,11 @@ type EventHandler = (event: HookEvent, existing: ExistingFields) => SessionField
 const eventHandlers: Record<HookEventName, EventHandler> = {
   SessionStart: (event, existing) => {
     // Log for investigation - will be visible in hqm logs
-    console.error(
-      `[SessionStart] source=${event.source}, session_id=${event.session_id}, tty=${event.tty}`
-    );
+    logger.info('SessionStart event', {
+      source: event.source,
+      session_id: event.session_id,
+      tty: event.tty,
+    });
     return {
       lastPrompt: existing.last_prompt,
       currentTool: undefined,

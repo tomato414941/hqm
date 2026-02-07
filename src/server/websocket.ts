@@ -2,7 +2,7 @@ import type { IncomingMessage } from 'node:http';
 import type { WebSocket, WebSocketServer } from 'ws';
 import { getProjects, getSessions } from '../store/file-store.js';
 import type { Project, Session } from '../types/index.js';
-import { serverLog } from '../utils/debug.js';
+import { logger } from '../utils/logger.js';
 import { handleFocusCommand } from './handlers/focus.js';
 import { handleGetHistoryCommand } from './handlers/history.js';
 import { handleSendKeystrokeCommand, handleSendTextCommand } from './handlers/send-text.js';
@@ -91,23 +91,22 @@ export function setupWebSocketHandlers(wss: WebSocketServer, validToken: string)
     const clientIP = req.socket.remoteAddress || 'unknown';
 
     if (requestToken !== validToken) {
-      serverLog('WS_CONNECT', `Auth failed from ${clientIP}`);
+      logger.info(`WebSocket auth failed from ${clientIP}`);
       ws.close(1008, 'Unauthorized');
       return;
     }
 
-    serverLog('WS_CONNECT', `Client connected from ${clientIP}`);
+    logger.info(`WebSocket client connected from ${clientIP}`);
 
     void sendSessionsToClient(ws);
     ws.on('message', (data: Buffer) => handleWebSocketMessage(ws, data));
 
     ws.on('close', (code: number) => {
-      serverLog('WS_DISCONNECT', `Client disconnected (code: ${code})`);
+      logger.info(`WebSocket client disconnected (code: ${code})`);
     });
 
     ws.on('error', (error) => {
-      serverLog('WS_ERROR', error.message);
-      console.error('WebSocket client error:', error.message);
+      logger.warn('WebSocket client error', { error: error.message });
     });
   });
 }
