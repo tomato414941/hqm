@@ -1,20 +1,10 @@
-import { appendFileSync, mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-
-const DEBUG_LOG_PATH = join(homedir(), '.hqm', 'debug.log');
+import { logger } from './logger.js';
 
 /**
- * Write a debug log entry with timestamp
+ * @deprecated Use logger.debug() directly
  */
 export function debugLog(message: string): void {
-  try {
-    mkdirSync(join(homedir(), '.hqm'), { recursive: true });
-    const timestamp = new Date().toISOString();
-    appendFileSync(DEBUG_LOG_PATH, `[${timestamp}] ${message}\n`);
-  } catch {
-    // Ignore errors in debug logging
-  }
+  logger.debug(message);
 }
 
 type ServerLogLevel =
@@ -25,11 +15,23 @@ type ServerLogLevel =
   | 'WS_ERROR'
   | 'HTTP_ERROR';
 
+const SERVER_LOG_LEVEL_MAP: Record<ServerLogLevel, 'info' | 'warn'> = {
+  STARTUP: 'info',
+  SHUTDOWN: 'info',
+  WS_CONNECT: 'info',
+  WS_DISCONNECT: 'info',
+  WS_ERROR: 'warn',
+  HTTP_ERROR: 'warn',
+};
+
+/**
+ * @deprecated Use logger.info/warn() directly
+ */
 export function serverLog(
   level: ServerLogLevel,
   message: string,
   data?: Record<string, unknown>
 ): void {
-  const dataStr = data ? ` ${JSON.stringify(data)}` : '';
-  debugLog(`[${level}] ${message}${dataStr}`);
+  const logLevel = SERVER_LOG_LEVEL_MAP[level];
+  logger[logLevel](message, data);
 }
