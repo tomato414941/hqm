@@ -78,6 +78,25 @@ describe('focus', () => {
       );
     });
 
+    it('should create new window with codex command when command is codex', () => {
+      process.env.HQM_TMUX_SESSION = 'work';
+      mockExecFileSync.mockImplementation((cmd, args) => {
+        if (cmd === 'which') return '/usr/bin/tmux';
+        if (cmd === 'tmux' && args?.[0] === 'new-window') return 'work:1\n';
+        if (cmd === 'tmux' && args?.[0] === 'display') return '/dev/pts/5\n';
+        return '';
+      });
+
+      const result = createNewSession('codex');
+
+      expect(result).toBe('/dev/pts/5');
+      expect(mockExecFileSync).toHaveBeenCalledWith(
+        'tmux',
+        ['new-window', '-t', 'work', '-P', '-F', '#{session_name}:#{window_index}', 'codex'],
+        expect.objectContaining({ encoding: 'utf-8' })
+      );
+    });
+
     it('should create new window in current session when HQM_TMUX_SESSION is not set', () => {
       delete process.env.HQM_TMUX_SESSION;
       mockExecFileSync.mockImplementation((cmd, args) => {

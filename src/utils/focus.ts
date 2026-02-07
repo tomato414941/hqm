@@ -116,7 +116,7 @@ export function getSupportedTerminals(): string[] {
  * Create a new tmux window and launch Claude Code
  * @returns The TTY of the new window, or null if failed
  */
-export function createNewSession(): string | null {
+export function createNewSession(command: 'claude' | 'codex' = 'claude'): string | null {
   if (!isLinux()) return null;
   if (!isTmuxAvailable()) return null;
   if (!isInsideTmux()) return null;
@@ -126,8 +126,8 @@ export function createNewSession(): string | null {
 
     // -P -F でウィンドウターゲットを取得
     const newWindowArgs = targetSession
-      ? ['new-window', '-t', targetSession, '-P', '-F', '#{session_name}:#{window_index}', 'claude']
-      : ['new-window', '-P', '-F', '#{session_name}:#{window_index}', 'claude'];
+      ? ['new-window', '-t', targetSession, '-P', '-F', '#{session_name}:#{window_index}', command]
+      : ['new-window', '-P', '-F', '#{session_name}:#{window_index}', command];
 
     const newWindowTarget = execFileSync('tmux', newWindowArgs, {
       encoding: 'utf-8',

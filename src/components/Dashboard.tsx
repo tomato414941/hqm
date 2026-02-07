@@ -421,30 +421,33 @@ export function Dashboard({
     [displayOrder, selectedIndex, projects]
   );
 
-  const handleNewSession = useCallback(() => {
-    const selectedSession = displayOrder[selectedIndex];
-    const sessionKey = selectedSession ? selectedSession.session_id : undefined;
-    const projectId = sessionKey ? getSessionProject(sessionKey) : undefined;
+  const handleNewSession = useCallback(
+    (command: 'claude' | 'codex' = 'claude') => {
+      const selectedSession = displayOrder[selectedIndex];
+      const sessionKey = selectedSession ? selectedSession.session_id : undefined;
+      const projectId = sessionKey ? getSessionProject(sessionKey) : undefined;
 
-    logger.debug(
-      `handleNewSession: selectedIndex=${selectedIndex}, sessionKey=${sessionKey}, projectId=${projectId}`
-    );
-
-    const newTty = createNewSession();
-    logger.debug(`handleNewSession: newTty=${newTty}`);
-
-    if (newTty && projectId) {
-      // Set up pending assignment for the new session
       logger.debug(
-        `handleNewSession: setting pendingAssignment tty=${newTty}, projectId=${projectId}`
+        `handleNewSession: selectedIndex=${selectedIndex}, sessionKey=${sessionKey}, projectId=${projectId}`
       );
-      setPendingAssignment({
-        tty: newTty,
-        projectId,
-        createdAt: Date.now(),
-      });
-    }
-  }, [displayOrder, selectedIndex]);
+
+      const newTty = createNewSession(command);
+      logger.debug(`handleNewSession: newTty=${newTty}`);
+
+      if (newTty && projectId) {
+        // Set up pending assignment for the new session
+        logger.debug(
+          `handleNewSession: setting pendingAssignment tty=${newTty}, projectId=${projectId}`
+        );
+        setPendingAssignment({
+          tty: newTty,
+          projectId,
+          createdAt: Date.now(),
+        });
+      }
+    },
+    [displayOrder, selectedIndex]
+  );
 
   const handleReorderSession = useCallback(
     (direction: 'up' | 'down') => {
@@ -656,7 +659,11 @@ export function Dashboard({
       return;
     }
     if (input === 'n') {
-      handleNewSession();
+      handleNewSession('claude');
+      return;
+    }
+    if (input === 'N') {
+      handleNewSession('codex');
       return;
     }
     if (input === 'p') {
@@ -799,7 +806,7 @@ export function Dashboard({
           <Text dimColor>[Enter]Focus</Text>
           <Text dimColor>[p]Project</Text>
           <Text dimColor>[a]Assign</Text>
-          <Text dimColor>[n]New</Text>
+          <Text dimColor>[n]Claude [N]Codex</Text>
           <Text dimColor>[q]Quit</Text>
         </Box>
 
