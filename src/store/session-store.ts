@@ -7,7 +7,6 @@ import { endPerf, startPerf } from '../utils/perf.js';
 import { getSessionKey } from '../utils/session-key.js';
 import { determineStatus } from '../utils/session-status.js';
 import { parseISOTimestamp } from '../utils/time.js';
-import { getLastAssistantMessage, getTranscriptPath } from '../utils/transcript.js';
 import { getSessionTimeoutMs } from './config.js';
 import {
   addSessionToDisplayOrder,
@@ -97,17 +96,6 @@ export function updateSessionInStore(
     notification_type: existing?.notification_type,
   });
 
-  // Get last assistant message from transcript
-  let lastMessage = existing?.lastMessage;
-  const initialCwd = existing?.initial_cwd ?? event.cwd;
-  const transcriptPath = getTranscriptPath(event.session_id, initialCwd);
-  if (transcriptPath) {
-    const message = getLastAssistantMessage(transcriptPath);
-    if (message) {
-      lastMessage = message;
-    }
-  }
-
   const session: Session = {
     session_id: event.session_id,
     cwd: event.cwd,
@@ -123,7 +111,7 @@ export function updateSessionInStore(
     last_prompt: updates.lastPrompt,
     current_tool: updates.currentTool,
     notification_type: updates.notificationType,
-    lastMessage,
+    lastMessage: existing?.lastMessage,
   };
 
   store.sessions[key] = session;

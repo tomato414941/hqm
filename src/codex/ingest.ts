@@ -23,11 +23,9 @@ interface CodexFileState {
 }
 
 const fileStates = new Map<string, CodexFileState>();
-const CODEX_SYNC_THROTTLE_MS = 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 let watcher: FSWatcher | null = null;
-let lastSyncAt = 0;
 
 function isCodexDisabled(): boolean {
   const flag = process.env.HQM_DISABLE_CODEX;
@@ -316,15 +314,6 @@ export function syncCodexSessionsOnce(): void {
     }
     ingestCodexFile(filePath);
   }
-}
-
-export function syncCodexSessionsIfNeeded(): void {
-  const now = Date.now();
-  if (now - lastSyncAt < CODEX_SYNC_THROTTLE_MS) {
-    return;
-  }
-  lastSyncAt = now;
-  syncCodexSessionsOnce();
 }
 
 export function startCodexWatcher(): void {
