@@ -35,9 +35,6 @@ export interface Session {
   current_tool?: string;
   notification_type?: string;
   lastMessage?: string;
-  summary?: string;
-  summary_transcript_size?: number;
-  needs_summary?: boolean;
 }
 
 // Project for grouping sessions

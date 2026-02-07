@@ -7,7 +7,6 @@ import {
   SESSION_UPDATE_DEBOUNCE_MS,
   TMUX_REFRESH_INTERVAL_MS,
 } from '../constants.js';
-import { generateSessionSummaryIfNeeded } from '../services/summary.js';
 import { getSessionTimeoutMs } from '../store/config.js';
 import {
   cleanupStaleSessions,
@@ -18,9 +17,6 @@ import {
   syncTmuxSessionsOnce,
 } from '../store/file-store.js';
 import type { Project, Session } from '../types/index.js';
-
-// Track sessions that are currently generating summaries
-const generatingSummaries = new Set<string>();
 
 export function useSessions(): {
   sessions: Session[];
@@ -41,33 +37,6 @@ export function useSessions(): {
       setSessions(data);
       setProjects(projectData);
       setError(null);
-
-      // Clean up stale entries from generatingSummaries
-      const activeSessionIds = new Set(data.map((s) => s.session_id));
-      for (const id of generatingSummaries) {
-        if (!activeSessionIds.has(id)) {
-          generatingSummaries.delete(id);
-        }
-      }
-
-      // Generate summaries for sessions that need it (in background)
-      for (const session of data) {
-        if (session.needs_summary) {
-          if (generatingSummaries.has(session.session_id)) {
-            continue; // Already generating
-          }
-          generatingSummaries.add(session.session_id);
-          generateSessionSummaryIfNeeded(session)
-            .then((summary) => {
-              if (summary) {
-                setSessions(getSessions());
-              }
-            })
-            .finally(() => {
-              generatingSummaries.delete(session.session_id);
-            });
-        }
-      }
     } catch (e) {
       setError(e instanceof Error ? e : new Error('Failed to load sessions'));
     } finally {

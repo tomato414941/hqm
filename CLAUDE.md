@@ -61,7 +61,7 @@ The web UI displays `session.lastMessage || session.last_prompt` for each sessio
 - `public/` - Static files for mobile Web UI
 
 ### Session Data
-Sessions are keyed by `{session_id}@{tty}` and stored in `~/.hqm/sessions.json` with: status, cwd, last_prompt, current_tool, notification_type, lastMessage, summary, timestamps, projectId.
+Sessions are keyed by `{session_id}@{tty}` and stored in `~/.hqm/sessions.json` with: status, cwd, last_prompt, current_tool, notification_type, lastMessage, timestamps, projectId.
 
 Projects are stored in `~/.hqm/projects.json` with: id, name, createdAt.
 
@@ -82,3 +82,23 @@ Config is stored in `~/.hqm/config.json`.
 - `clearSessions` removes all session items from displayOrder
 - New sessions are always added to "ungrouped" after clear
 - `assignedCwds` auto-assignment was removed (caused mis-grouping with broad paths like `/home/dev`). New sessions always go to ungrouped; users assign manually. TTY inheritance is preserved.
+
+### Hook events (important — repeated confusion has occurred)
+- `Stop` = Claude **completed a response** (fires every turn). NOT `/exit`.
+- `SessionEnd` = session terminated (`/exit`, `/clear`, logout). HQM does NOT register this hook.
+- HQM's `status: 'stopped'` = "Claude finished responding, waiting for user input"
+- `/exit` can only be detected via `SessionEnd` (unregistered) or TTY close
+- Reference: https://code.claude.com/docs/en/hooks
+
+### Removed features
+- **AI Summary** (removed): Used `Stop` event to trigger summary generation, causing it to fire every turn. Had `@anthropic-ai/sdk` dependency. If re-implemented, design for "quickly understand ongoing session" purpose, not session-end summaries.
+
+### CWD fallback matching
+- `findBestPaneMatch` (CWD-score-based tmux pane matching) is **Codex-only**. Claude Code always provides TTY via hooks, so CWD fallback is unnecessary. Codex sessions ingested from JONL logs may lack TTY.
+
+### Improvement backlog (priority order)
+1. **Log infrastructure** (#17): Unified logger, levels, rotation. Prerequisite for other improvements.
+2. Error notification UI (#11): Surface transcript/tmux errors to user. Build on #17.
+3. Session auto-archive (#14): Archive instead of delete. Long-term stability.
+4. Status filtering (#8): Toggle running/waiting/stopped visibility. Low effort.
+5. Command detection bypass fix (#18): Move from regex to parser-based validation.

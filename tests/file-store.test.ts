@@ -789,33 +789,4 @@ describe('file-store', () => {
       });
     });
   });
-
-  describe('updateSessionSummary', () => {
-    it('should update session summary', async () => {
-      const { updateSession, updateSessionSummary, getSession, flushPendingWrites } = await import(
-        '../src/store/file-store.js'
-      );
-
-      updateSession({
-        session_id: 'test-session',
-        cwd: '/tmp',
-        hook_event_name: 'PreToolUse',
-      });
-      await flushPendingWrites();
-
-      updateSessionSummary('test-session', undefined, 'This is a summary', 1000);
-
-      const session = getSession('test-session');
-      expect(session?.summary).toBe('This is a summary');
-      expect(session?.summary_transcript_size).toBe(1000);
-    });
-
-    it('should do nothing for non-existent session', async () => {
-      const { updateSessionSummary, getSession } = await import('../src/store/file-store.js');
-
-      updateSessionSummary('non-existent', undefined, 'Summary', 1000);
-
-      expect(getSession('non-existent')).toBeUndefined();
-    });
-  });
 });

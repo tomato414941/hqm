@@ -266,19 +266,6 @@
       background: currentColor;
     }
 
-    .card-status-summary {
-      flex: 1;
-      font-size: 11px;
-      font-weight: 500;
-      text-transform: none;
-      letter-spacing: 0;
-      color: var(--text-secondary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-left: 8px;
-    }
-
     .card.running .card-status-dot {
       animation: pulse 1.5s ease-in-out infinite;
     }
@@ -327,13 +314,6 @@
       font-size: 13px;
       color: var(--text-muted);
       font-style: italic;
-    }
-
-    .card-summary {
-      margin-top: 10px;
-      font-size: 13px;
-      color: var(--text-secondary);
-      line-height: 1.5;
     }
 
     .modal-waiting-notice {
@@ -1404,10 +1384,6 @@
       const dirName = escapeHtml(getDirName(session.cwd));
       const shortPath = escapeHtml(formatPath(session.cwd));
       const statusLabel = escapeHtml(STATUS[session.status]);
-      const isStopped = session.status === 'stopped';
-      const summaryText = isStopped && session.summary
-        ? escapeHtml(truncateMessage(session.summary, 60))
-        : null;
       const msgPreview = escapeHtml(truncateMessage(session.lastMessage || session.last_prompt));
       const safeStatus = escapeHtml(session.status);
 
@@ -1416,7 +1392,6 @@
           <div class="card-status">
             <span class="card-status-dot"></span>
             <span>${statusLabel}</span>
-            ${summaryText ? `<span class="card-status-summary">📝 ${summaryText}</span>` : ''}
             <span class="card-status-chevron">›</span>
           </div>
           <div class="card-body">

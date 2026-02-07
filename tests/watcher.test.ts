@@ -34,12 +34,6 @@ vi.mock('../src/codex/ingest.js', () => ({
   startCodexWatcher: vi.fn(),
 }));
 
-// Mock summary service
-const mockGenerateSummary = vi.fn();
-vi.mock('../src/services/summary.js', () => ({
-  generateSessionSummaryIfNeeded: (session: Session) => mockGenerateSummary(session),
-}));
-
 // Mock websocket
 const mockBroadcast = vi.fn();
 vi.mock('../src/server/websocket.js', () => ({
@@ -97,88 +91,6 @@ describe('watcher', () => {
         data: sessions,
         projects: [],
       });
-    });
-
-    it('should trigger summary generation for sessions with needs_summary flag', async () => {
-      const { createFileWatcher } = await import('../src/server/watcher.js');
-      const mockWss = { clients: new Set() };
-
-      const sessions: Session[] = [
-        {
-          session_id: 'stopped-1',
-          cwd: '/tmp',
-          initial_cwd: '/tmp',
-          status: 'stopped',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          needs_summary: true,
-        },
-      ];
-      mockGetSessions.mockReturnValue(sessions);
-      mockGenerateSummary.mockResolvedValue('Generated summary');
-
-      createFileWatcher(mockWss as never);
-
-      const changeHandler = mockWatcher.on.mock.calls.find((call) => call[0] === 'change')?.[1];
-
-      await changeHandler('/tmp/sessions.json');
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(mockGenerateSummary).toHaveBeenCalledWith(sessions[0]);
-    });
-
-    it('should not generate summary for sessions without needs_summary flag', async () => {
-      const { createFileWatcher } = await import('../src/server/watcher.js');
-      const mockWss = { clients: new Set() };
-
-      const sessions: Session[] = [
-        {
-          session_id: 'stopped-with-summary',
-          cwd: '/tmp',
-          initial_cwd: '/tmp',
-          status: 'stopped',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          summary: 'Already has summary',
-          needs_summary: false,
-        },
-      ];
-      mockGetSessions.mockReturnValue(sessions);
-
-      createFileWatcher(mockWss as never);
-
-      const changeHandler = mockWatcher.on.mock.calls.find((call) => call[0] === 'change')?.[1];
-
-      await changeHandler('/tmp/sessions.json');
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(mockGenerateSummary).not.toHaveBeenCalled();
-    });
-
-    it('should not generate summary for running sessions', async () => {
-      const { createFileWatcher } = await import('../src/server/watcher.js');
-      const mockWss = { clients: new Set() };
-
-      const sessions: Session[] = [
-        {
-          session_id: 'running-1',
-          cwd: '/tmp',
-          initial_cwd: '/tmp',
-          status: 'running',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ];
-      mockGetSessions.mockReturnValue(sessions);
-
-      createFileWatcher(mockWss as never);
-
-      const changeHandler = mockWatcher.on.mock.calls.find((call) => call[0] === 'change')?.[1];
-
-      await changeHandler('/tmp/sessions.json');
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(mockGenerateSummary).not.toHaveBeenCalled();
     });
   });
 });

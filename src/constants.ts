@@ -70,9 +70,6 @@ export const PENDING_ASSIGNMENT_TIMEOUT_MS = 30_000;
 /** Maximum number of visible sessions in the dashboard */
 export const MAX_VISIBLE_SESSIONS = 9;
 
-/** Threshold in bytes for regenerating session summary */
-export const SUMMARY_REGENERATE_THRESHOLD_BYTES = 5_000;
-
 /** Maximum text length for send-text feature */
 export const MAX_SEND_TEXT_LENGTH = 10_000;
 

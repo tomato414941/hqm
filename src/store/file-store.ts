@@ -38,7 +38,6 @@ import {
   removeSessionFromStore,
   updateSessionInStore,
   updateSessionLastMessageInStore,
-  updateSessionSummaryInStore,
 } from './session-store.js';
 import { syncTranscripts } from './transcript-sync.js';
 import { getCachedStore, initWriteCache, scheduleWrite } from './write-cache.js';
@@ -250,7 +249,7 @@ export function syncTmuxSessionsOnce(): void {
     if (session.tty) {
       pane = panesByTty.get(session.tty);
     }
-    if (!pane) {
+    if (!pane && agent === 'codex') {
       const updatedMs = parseISOTimestamp(session.updated_at);
       if (updatedMs !== null && Date.now() - updatedMs > TMUX_INFERENCE_WINDOW_MS) {
         stats.skippedOld += 1;
@@ -333,9 +332,6 @@ export function syncTmuxSessionsOnce(): void {
       current_tool: existing?.current_tool,
       notification_type: existing?.notification_type,
       lastMessage: existing?.lastMessage,
-      summary: existing?.summary,
-      summary_transcript_size: existing?.summary_transcript_size,
-      needs_summary: existing?.needs_summary,
     };
 
     const changed =
@@ -430,16 +426,6 @@ export function removeSession(sessionId: string): void {
 export function clearSessions(): void {
   const store = readStore();
   clearSessionsFromStore(store, writeStore);
-}
-
-export function updateSessionSummary(
-  sessionId: string,
-  _tty: string | undefined,
-  summary: string,
-  transcriptSize?: number
-): void {
-  const store = readStore();
-  updateSessionSummaryInStore(store, sessionId, summary, transcriptSize, writeStore);
 }
 
 export function updateSessionLastMessage(

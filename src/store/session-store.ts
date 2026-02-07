@@ -124,8 +124,6 @@ export function updateSessionInStore(
     current_tool: updates.currentTool,
     notification_type: updates.notificationType,
     lastMessage,
-    summary: existing?.summary,
-    summary_transcript_size: existing?.summary_transcript_size,
   };
 
   store.sessions[key] = session;
@@ -248,34 +246,6 @@ export function clearSessionsFromStore(
   }
   store.updated_at = new Date().toISOString();
   writeStore(store);
-}
-
-/**
- * Update session with summary
- * Note: Searches by session_id only, ignoring TTY.
- */
-export function updateSessionSummaryInStore(
-  store: StoreData,
-  sessionId: string,
-  summary: string,
-  transcriptSize: number | undefined,
-  writeStore: (data: StoreData) => void
-): void {
-  // Search by session_id only (TTY may differ at Stop event)
-  const entry = Object.entries(store.sessions).find(
-    ([, session]) => session.session_id === sessionId
-  );
-
-  if (entry) {
-    const [key, session] = entry;
-    session.summary = summary;
-    if (transcriptSize !== undefined) {
-      session.summary_transcript_size = transcriptSize;
-    }
-    session.updated_at = new Date().toISOString();
-    store.sessions[key] = session;
-    writeStore(store);
-  }
 }
 
 /**

@@ -44,8 +44,7 @@ function arePropsEqual(prevProps: SessionCardProps, nextProps: SessionCardProps)
     prev.last_prompt === next.last_prompt &&
     prev.current_tool === next.current_tool &&
     prev.notification_type === next.notification_type &&
-    prev.lastMessage === next.lastMessage &&
-    prev.summary === next.summary
+    prev.lastMessage === next.lastMessage
   );
 }
 
@@ -75,14 +74,8 @@ export const SessionCard = memo(function SessionCard({
   const dir = truncateText(abbreviateHomePath(session.cwd), maxDirLength);
   const relativeTime = formatRelativeTime(session.updated_at);
   const isRunning = session.status === 'running';
-  const isStopped = session.status === 'stopped';
 
-  // Line 2: summary (📝 takes ~2 chars visually)
-  const summaryMaxLength = maxLineLength - 3;
-  const summary =
-    isStopped && session.summary ? truncateText(session.summary, summaryMaxLength) : undefined;
-
-  // Line 3: prompt and lastMessage share the space
+  // Line 2: prompt and lastMessage share the space
   const hasPrompt = !!session.last_prompt;
   const hasLastMessage = !!session.lastMessage;
   const arrowLength = hasPrompt && hasLastMessage ? 3 : 0; // " → " (→ is halfwidth=1 in string-width)
@@ -127,15 +120,7 @@ export const SessionCard = memo(function SessionCard({
         <Text color={isCodex ? 'green' : 'yellow'}>{idText} </Text>
         <Text color={isSelected ? 'white' : 'gray'}>{dir}</Text>
       </Box>
-      {/* Line 2: Summary (if stopped and has summary) */}
-      {summary && (
-        <Box paddingX={1}>
-          <Text>{LINE_INDENT}</Text>
-          <Text color="blue">📝 </Text>
-          <Text color="gray">{summary}</Text>
-        </Box>
-      )}
-      {/* Line 3: Prompt → Response */}
+      {/* Line 2: Prompt → Response */}
       {(prompt || lastMessage) && (
         <Box paddingX={1}>
           <Text>{LINE_INDENT}</Text>

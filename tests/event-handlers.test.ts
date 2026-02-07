@@ -61,19 +61,6 @@ describe('event-handlers', () => {
 
         expect(result.lastPrompt).toBe('Previous prompt');
       });
-
-      it('should set needsSummary to false', () => {
-        const event: HookEvent = {
-          session_id: 'test',
-          cwd: '/tmp',
-          hook_event_name: 'UserPromptSubmit',
-          prompt: 'Test',
-        };
-
-        const result = getFieldUpdates(event, {});
-
-        expect(result.needsSummary).toBe(false);
-      });
     });
 
     describe('PreToolUse', () => {
@@ -105,19 +92,6 @@ describe('event-handlers', () => {
 
         expect(result.lastPrompt).toBe('Existing prompt');
         expect(result.notificationType).toBe('some_notification');
-      });
-
-      it('should set needsSummary to false', () => {
-        const event: HookEvent = {
-          session_id: 'test',
-          cwd: '/tmp',
-          hook_event_name: 'PreToolUse',
-          tool_name: 'Read',
-        };
-
-        const result = getFieldUpdates(event, {});
-
-        expect(result.needsSummary).toBe(false);
       });
     });
 
@@ -151,18 +125,6 @@ describe('event-handlers', () => {
         expect(result.lastPrompt).toBe('Existing prompt');
         expect(result.notificationType).toBe('some_notification');
       });
-
-      it('should set needsSummary to false', () => {
-        const event: HookEvent = {
-          session_id: 'test',
-          cwd: '/tmp',
-          hook_event_name: 'PostToolUse',
-        };
-
-        const result = getFieldUpdates(event, {});
-
-        expect(result.needsSummary).toBe(false);
-      });
     });
 
     describe('Notification', () => {
@@ -194,19 +156,6 @@ describe('event-handlers', () => {
 
         expect(result.lastPrompt).toBe('Existing prompt');
         expect(result.currentTool).toBe('Bash');
-      });
-
-      it('should set needsSummary to true', () => {
-        const event: HookEvent = {
-          session_id: 'test',
-          cwd: '/tmp',
-          hook_event_name: 'Notification',
-          notification_type: 'permission_prompt',
-        };
-
-        const result = getFieldUpdates(event, {});
-
-        expect(result.needsSummary).toBe(true);
       });
     });
 
@@ -251,18 +200,6 @@ describe('event-handlers', () => {
         });
 
         expect(result.lastPrompt).toBe('Final prompt');
-      });
-
-      it('should set needsSummary to true', () => {
-        const event: HookEvent = {
-          session_id: 'test',
-          cwd: '/tmp',
-          hook_event_name: 'Stop',
-        };
-
-        const result = getFieldUpdates(event, {});
-
-        expect(result.needsSummary).toBe(true);
       });
     });
   });
