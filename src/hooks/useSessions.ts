@@ -1,13 +1,11 @@
 import { basename, dirname } from 'node:path';
 import chokidar from 'chokidar';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { startCodexWatcher } from '../codex/ingest.js';
 import {
   SESSION_REFRESH_INTERVAL_MS,
   SESSION_UPDATE_DEBOUNCE_MS,
   TMUX_REFRESH_INTERVAL_MS,
 } from '../constants.js';
-import { getSessionTimeoutMs } from '../store/config.js';
 import {
   cleanupStaleSessions,
   getProjects,
@@ -55,7 +53,6 @@ export function useSessions(): {
   }, [loadSessions]);
 
   useEffect(() => {
-    startCodexWatcher();
     syncTmuxSessionsOnce();
 
     // Initial load (immediate, no debounce)
@@ -78,21 +75,15 @@ export function useSessions(): {
       if (basename(filePath) === storeBasename) debouncedLoadSessions();
     });
 
-    // Periodic cleanup for timeout detection (only if timeout is enabled)
+    // Periodic cleanup for TTY close detection and timeout
     // cleanup → writeStore → chokidar detects change → debouncedLoadSessions fires
-    const timeoutMs = getSessionTimeoutMs();
-    let interval: ReturnType<typeof setInterval> | undefined;
-    if (timeoutMs > 0) {
-      interval = setInterval(cleanupStaleSessions, SESSION_REFRESH_INTERVAL_MS);
-    }
+    const cleanupInterval = setInterval(cleanupStaleSessions, SESSION_REFRESH_INTERVAL_MS);
 
     const tmuxInterval = setInterval(syncTmuxSessionsIfNeeded, TMUX_REFRESH_INTERVAL_MS);
 
     return () => {
       watcher.close();
-      if (interval) {
-        clearInterval(interval);
-      }
+      clearInterval(cleanupInterval);
       clearInterval(tmuxInterval);
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);

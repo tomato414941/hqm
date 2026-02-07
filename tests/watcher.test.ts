@@ -29,11 +29,6 @@ vi.mock('../src/store/config.js', () => ({
   getSessionTimeoutMs: () => 0,
 }));
 
-// Mock codex ingest
-vi.mock('../src/codex/ingest.js', () => ({
-  startCodexWatcher: vi.fn(),
-}));
-
 // Mock websocket
 const mockBroadcast = vi.fn();
 vi.mock('../src/server/websocket.js', () => ({

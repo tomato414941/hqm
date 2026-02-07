@@ -22,6 +22,7 @@ import {
   getDisplayOrder,
   getSessionProject,
   moveInDisplayOrder,
+  registerCodexSession,
   removeSession,
   reorderProject,
 } from '../store/file-store.js';
@@ -431,16 +432,20 @@ export function Dashboard({
         `handleNewSession: selectedIndex=${selectedIndex}, sessionKey=${sessionKey}, projectId=${projectId}`
       );
 
-      const newTty = createNewSession(command);
-      logger.debug(`handleNewSession: newTty=${newTty}`);
+      const result = createNewSession(command);
+      logger.debug(`handleNewSession: result=${JSON.stringify(result)}`);
 
-      if (newTty && projectId) {
-        // Set up pending assignment for the new session
-        logger.debug(
-          `handleNewSession: setting pendingAssignment tty=${newTty}, projectId=${projectId}`
-        );
+      if (!result) return;
+
+      if (command === 'codex') {
+        const codexSessionId = registerCodexSession(result);
+        logger.debug(`handleNewSession: registered codex session ${codexSessionId}`);
+        if (projectId) {
+          assignSessionToProjectInOrder(codexSessionId, projectId);
+        }
+      } else if (projectId) {
         setPendingAssignment({
-          tty: newTty,
+          tty: result.tty,
           projectId,
           createdAt: Date.now(),
         });

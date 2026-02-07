@@ -112,11 +112,17 @@ export function getSupportedTerminals(): string[] {
   return ['tmux'];
 }
 
+export interface NewSessionInfo {
+  tty: string;
+  tmuxTarget: string;
+  paneId: string;
+}
+
 /**
- * Create a new tmux window and launch Claude Code
- * @returns The TTY of the new window, or null if failed
+ * Create a new tmux window and launch Claude Code or Codex
+ * @returns TTY, tmux target, and pane ID of the new window, or null if failed
  */
-export function createNewSession(command: 'claude' | 'codex' = 'claude'): string | null {
+export function createNewSession(command: 'claude' | 'codex' = 'claude'): NewSessionInfo | null {
   if (!isLinux()) return null;
   if (!isTmuxAvailable()) return null;
   if (!isInsideTmux()) return null;
@@ -134,11 +140,20 @@ export function createNewSession(command: 'claude' | 'codex' = 'claude'): string
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
 
-    // Get the TTY of the new window
-    const tty = execFileSync('tmux', ['display', '-t', newWindowTarget, '-p', '#{pane_tty}'], {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+    // Get TTY, target, and pane ID in a single call
+    const info = execFileSync(
+      'tmux',
+      [
+        'display',
+        '-t',
+        newWindowTarget,
+        '-p',
+        '#{pane_tty}\t#{pane_id}\t#{session_name}:#{window_index}.#{pane_index}',
+      ],
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+    ).trim();
+
+    const [tty, paneId, tmuxTarget] = info.split('\t');
 
     // 新ウィンドウにフォーカスを移動
     execFileSync('tmux', ['switch-client', '-t', newWindowTarget], {
@@ -146,7 +161,9 @@ export function createNewSession(command: 'claude' | 'codex' = 'claude'): string
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
-    return tty || null;
+    if (!tty || !paneId || !tmuxTarget) return null;
+
+    return { tty, tmuxTarget, paneId };
   } catch {
     return null;
   }

@@ -2,7 +2,6 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { isCodexSessionId } from '../codex/paths.js';
-import { TMUX_INFERENCE_WINDOW_MS } from '../constants.js';
 import type { DisplayOrderItem, HookEvent, Project, Session, StoreData } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { parseISOTimestamp } from '../utils/time.js';
@@ -107,53 +106,9 @@ function resolveUpdatedAt(existing: string | undefined, lastActiveSeconds: numbe
   return Date.parse(candidate) > existingMs ? candidate : existing;
 }
 
-function normalizePath(path: string): string {
-  if (!path) return '';
-  return path.replace(/\/+$/, '');
-}
-
-function cwdMatchScore(paneCwd: string, sessionCwd: string): number {
-  const pane = normalizePath(paneCwd);
-  const target = normalizePath(sessionCwd);
-  if (!pane || !target) return 0;
-  if (pane === target) return 3;
-  if (pane.startsWith(`${target}/`) || target.startsWith(`${pane}/`)) return 2;
-  return 0;
-}
-
 function detectAgentFromSession(session: Session): AgentType {
   if (session.agent) return session.agent;
   return isCodexSessionId(session.session_id) ? 'codex' : 'claude';
-}
-
-function findBestPaneMatch(
-  session: Session,
-  panes: TmuxPaneDetails[],
-  usedPaneIds: Set<string>
-): TmuxPaneDetails | undefined {
-  if (panes.length === 0) return undefined;
-
-  const candidates: Array<{
-    pane: TmuxPaneDetails;
-    score: number;
-  }> = [];
-
-  for (const pane of panes) {
-    if (usedPaneIds.has(pane.paneId)) continue;
-    const score = cwdMatchScore(pane.cwd, session.cwd);
-    if (score === 0) continue;
-    candidates.push({ pane, score });
-  }
-
-  if (candidates.length === 0) return undefined;
-
-  candidates.sort((a, b) => {
-    if (a.score !== b.score) return b.score - a.score;
-    if (a.pane.active !== b.pane.active) return a.pane.active ? -1 : 1;
-    return a.pane.target.localeCompare(b.pane.target);
-  });
-
-  return candidates[0].pane;
 }
 
 export function readStore(): StoreData {
@@ -218,10 +173,6 @@ export function syncTmuxSessionsOnce(): void {
   }
 
   const panesByTty = new Map<string, TmuxPaneDetails>();
-  const panesByAgent: Record<AgentType, TmuxPaneDetails[]> = {
-    claude: [],
-    codex: [],
-  };
 
   for (const pane of panes) {
     if (pane.tty) {
@@ -229,7 +180,6 @@ export function syncTmuxSessionsOnce(): void {
     }
     const agent = detectAgentFromCommand(pane.command);
     if (agent) {
-      panesByAgent[agent].push(pane);
       stats.agentPanes += 1;
     }
   }
@@ -249,18 +199,6 @@ export function syncTmuxSessionsOnce(): void {
     let pane: TmuxPaneDetails | undefined;
     if (session.tty) {
       pane = panesByTty.get(session.tty);
-    }
-    if (!pane && agent === 'codex') {
-      const updatedMs = parseISOTimestamp(session.updated_at);
-      if (updatedMs !== null && Date.now() - updatedMs > TMUX_INFERENCE_WINDOW_MS) {
-        stats.skippedOld += 1;
-        if (updated) {
-          store.sessions[key] = session;
-          hasChanges = true;
-        }
-        continue;
-      }
-      pane = findBestPaneMatch(session, panesByAgent[agent], usedPaneIds);
     }
     if (!pane) {
       if (updated) {
@@ -298,6 +236,9 @@ export function syncTmuxSessionsOnce(): void {
   for (const pane of panes) {
     const agent = detectAgentFromCommand(pane.command);
     if (!agent) continue;
+
+    // Codex sessions are only created via N key (registerCodexSession)
+    if (agent === 'codex') continue;
 
     if (usedPaneIds.has(pane.paneId)) {
       continue;
@@ -510,6 +451,36 @@ export function reorderProject(projectId: string, direction: 'up' | 'down'): voi
   const store = readStore();
   reorderProjectInStore(store, projectId, direction);
   writeStore(store);
+}
+
+export function registerCodexSession(info: {
+  tty: string;
+  tmuxTarget: string;
+  paneId: string;
+}): string {
+  const cleanedPaneId = info.paneId.replace(/^%+/, '');
+  const sessionId = `codex-n-${cleanedPaneId}`;
+  const now = new Date().toISOString();
+
+  const store = readStore();
+  const session: Session = {
+    session_id: sessionId,
+    cwd: process.cwd(),
+    initial_cwd: process.cwd(),
+    tty: info.tty,
+    agent: 'codex',
+    tmux_target: info.tmuxTarget,
+    tmux_pane_id: info.paneId,
+    status: 'running',
+    created_at: now,
+    updated_at: now,
+  };
+
+  store.sessions[sessionId] = session;
+  addSessionToDisplayOrder(store, sessionId);
+  writeStore(store);
+
+  return sessionId;
 }
 
 export function getStorePath(): string {

@@ -54,13 +54,13 @@ describe('focus', () => {
       mockExecFileSync.mockImplementation((cmd, args) => {
         if (cmd === 'which') return '/usr/bin/tmux';
         if (cmd === 'tmux' && args?.[0] === 'new-window') return 'work:1\n';
-        if (cmd === 'tmux' && args?.[0] === 'display') return '/dev/pts/5\n';
+        if (cmd === 'tmux' && args?.[0] === 'display') return '/dev/pts/5\t%10\twork:1.0\n';
         return '';
       });
 
       const result = createNewSession();
 
-      expect(result).toBe('/dev/pts/5');
+      expect(result).toEqual({ tty: '/dev/pts/5', paneId: '%10', tmuxTarget: 'work:1.0' });
       expect(mockExecFileSync).toHaveBeenCalledWith(
         'tmux',
         ['new-window', '-t', 'work', '-P', '-F', '#{session_name}:#{window_index}', 'claude'],
@@ -68,7 +68,13 @@ describe('focus', () => {
       );
       expect(mockExecFileSync).toHaveBeenCalledWith(
         'tmux',
-        ['display', '-t', 'work:1', '-p', '#{pane_tty}'],
+        [
+          'display',
+          '-t',
+          'work:1',
+          '-p',
+          '#{pane_tty}\t#{pane_id}\t#{session_name}:#{window_index}.#{pane_index}',
+        ],
         expect.objectContaining({ encoding: 'utf-8' })
       );
       expect(mockExecFileSync).toHaveBeenCalledWith(
@@ -83,13 +89,13 @@ describe('focus', () => {
       mockExecFileSync.mockImplementation((cmd, args) => {
         if (cmd === 'which') return '/usr/bin/tmux';
         if (cmd === 'tmux' && args?.[0] === 'new-window') return 'work:1\n';
-        if (cmd === 'tmux' && args?.[0] === 'display') return '/dev/pts/5\n';
+        if (cmd === 'tmux' && args?.[0] === 'display') return '/dev/pts/5\t%10\twork:1.0\n';
         return '';
       });
 
       const result = createNewSession('codex');
 
-      expect(result).toBe('/dev/pts/5');
+      expect(result).toEqual({ tty: '/dev/pts/5', paneId: '%10', tmuxTarget: 'work:1.0' });
       expect(mockExecFileSync).toHaveBeenCalledWith(
         'tmux',
         ['new-window', '-t', 'work', '-P', '-F', '#{session_name}:#{window_index}', 'codex'],
@@ -102,13 +108,13 @@ describe('focus', () => {
       mockExecFileSync.mockImplementation((cmd, args) => {
         if (cmd === 'which') return '/usr/bin/tmux';
         if (cmd === 'tmux' && args?.[0] === 'new-window') return 'main:2\n';
-        if (cmd === 'tmux' && args?.[0] === 'display') return '/dev/pts/3\n';
+        if (cmd === 'tmux' && args?.[0] === 'display') return '/dev/pts/3\t%5\tmain:2.0\n';
         return '';
       });
 
       const result = createNewSession();
 
-      expect(result).toBe('/dev/pts/3');
+      expect(result).toEqual({ tty: '/dev/pts/3', paneId: '%5', tmuxTarget: 'main:2.0' });
       expect(mockExecFileSync).toHaveBeenCalledWith(
         'tmux',
         ['new-window', '-P', '-F', '#{session_name}:#{window_index}', 'claude'],
@@ -116,7 +122,13 @@ describe('focus', () => {
       );
       expect(mockExecFileSync).toHaveBeenCalledWith(
         'tmux',
-        ['display', '-t', 'main:2', '-p', '#{pane_tty}'],
+        [
+          'display',
+          '-t',
+          'main:2',
+          '-p',
+          '#{pane_tty}\t#{pane_id}\t#{session_name}:#{window_index}.#{pane_index}',
+        ],
         expect.objectContaining({ encoding: 'utf-8' })
       );
       expect(mockExecFileSync).toHaveBeenCalledWith(

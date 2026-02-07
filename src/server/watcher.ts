@@ -2,9 +2,7 @@ import { basename, dirname } from 'node:path';
 import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import type { WebSocketServer } from 'ws';
-import { startCodexWatcher } from '../codex/ingest.js';
 import { SESSION_REFRESH_INTERVAL_MS, TMUX_REFRESH_INTERVAL_MS } from '../constants.js';
-import { getSessionTimeoutMs } from '../store/config.js';
 import {
   cleanupStaleSessions,
   getProjects,
@@ -16,7 +14,6 @@ import {
 import { broadcastToClients } from './websocket.js';
 
 export function createFileWatcher(wss: WebSocketServer): FSWatcher {
-  startCodexWatcher();
   syncTmuxSessionsOnce();
 
   const storePath = getStorePath();
@@ -41,15 +38,13 @@ export function createFileWatcher(wss: WebSocketServer): FSWatcher {
 
   const tmuxInterval = setInterval(syncTmuxSessionsIfNeeded, TMUX_REFRESH_INTERVAL_MS);
 
-  // Periodic cleanup for timeout detection
-  const timeoutMs = getSessionTimeoutMs();
-  const cleanupInterval =
-    timeoutMs > 0 ? setInterval(cleanupStaleSessions, SESSION_REFRESH_INTERVAL_MS) : undefined;
+  // Periodic cleanup for TTY close detection and timeout
+  const cleanupInterval = setInterval(cleanupStaleSessions, SESSION_REFRESH_INTERVAL_MS);
 
   const originalClose = watcher.close.bind(watcher);
   watcher.close = () => {
     clearInterval(tmuxInterval);
-    if (cleanupInterval) clearInterval(cleanupInterval);
+    clearInterval(cleanupInterval);
     return originalClose();
   };
 
