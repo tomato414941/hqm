@@ -1,18 +1,12 @@
 import { basename, dirname } from 'node:path';
 import chokidar from 'chokidar';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  SESSION_REFRESH_INTERVAL_MS,
-  SESSION_UPDATE_DEBOUNCE_MS,
-  TMUX_REFRESH_INTERVAL_MS,
-} from '../constants.js';
+import { SESSION_REFRESH_INTERVAL_MS, SESSION_UPDATE_DEBOUNCE_MS } from '../constants.js';
 import {
   cleanupStaleSessions,
   getProjects,
   getSessions,
   getStorePath,
-  syncTmuxSessionsIfNeeded,
-  syncTmuxSessionsOnce,
 } from '../store/file-store.js';
 import type { Project, Session } from '../types/index.js';
 
@@ -53,8 +47,6 @@ export function useSessions(): {
   }, [loadSessions]);
 
   useEffect(() => {
-    syncTmuxSessionsOnce();
-
     // Initial load (immediate, no debounce)
     loadSessions();
 
@@ -79,12 +71,9 @@ export function useSessions(): {
     // cleanup → writeStore → chokidar detects change → debouncedLoadSessions fires
     const cleanupInterval = setInterval(cleanupStaleSessions, SESSION_REFRESH_INTERVAL_MS);
 
-    const tmuxInterval = setInterval(syncTmuxSessionsIfNeeded, TMUX_REFRESH_INTERVAL_MS);
-
     return () => {
       watcher.close();
       clearInterval(cleanupInterval);
-      clearInterval(tmuxInterval);
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }

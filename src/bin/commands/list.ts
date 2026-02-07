@@ -1,11 +1,8 @@
-import { syncCodexSessionsOnce } from '../../codex/ingest.js';
-import { getSessions, syncTmuxSessionsOnce } from '../../store/file-store.js';
+import { getSessions } from '../../store/file-store.js';
 import { abbreviateHomePath } from '../../utils/path.js';
 import { getStatusDisplay } from '../../utils/status-display.js';
 
 export async function listAction(): Promise<void> {
-  syncCodexSessionsOnce();
-  syncTmuxSessionsOnce();
   const sessions = await getSessions();
   if (sessions.length === 0) {
     console.log('No active sessions');

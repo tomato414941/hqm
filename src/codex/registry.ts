@@ -78,10 +78,3 @@ export function getCodexTranscriptPath(sessionId: string): string | undefined {
   }
   return registry.get(rawId)?.path;
 }
-
-export function getCodexRegistrySize(): number {
-  if (Date.now() - lastRefresh > REGISTRY_TTL_MS) {
-    refreshCodexRegistry();
-  }
-  return registry.size;
-}

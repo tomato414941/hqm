@@ -22,13 +22,6 @@ export function isCodexSessionId(sessionId: string): boolean {
   return sessionId.startsWith(CODEX_SESSION_PREFIX);
 }
 
-export function encodeCodexSessionId(rawId: string): string {
-  if (rawId.startsWith(CODEX_SESSION_PREFIX)) {
-    return rawId;
-  }
-  return `${CODEX_SESSION_PREFIX}${rawId}`;
-}
-
 export function decodeCodexSessionId(sessionId: string): string {
   if (!isCodexSessionId(sessionId)) {
     return sessionId;

@@ -6,8 +6,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { syncCodexSessionsOnce } from '../src/codex/ingest.js';
-import { getSessions, readStore, syncTmuxSessionsOnce } from '../src/store/file-store.js';
+import { getSessions, readStore } from '../src/store/file-store.js';
 import { getSessionsFromStore } from '../src/store/session-store.js';
 import { refreshSessionRegistry } from '../src/utils/session-registry.js';
 import { getLastAssistantMessage, getTranscriptPath } from '../src/utils/transcript.js';
@@ -21,32 +20,22 @@ function measure<T>(label: string, fn: () => T): { result: T; ms: number } {
 
 console.log('=== HQM Startup Performance Benchmark ===\n');
 
-// 1. syncCodexSessionsOnce
-const { ms: codexMs } = measure('syncCodexSessionsOnce', () => {
-  syncCodexSessionsOnce();
-});
-
-// 2. syncTmuxSessionsOnce
-const { ms: tmuxMs } = measure('syncTmuxSessionsOnce', () => {
-  syncTmuxSessionsOnce();
-});
-
-// 3. readStore
+// 1. readStore
 const { ms: readStoreMs, result: store } = measure('readStore', () => {
   return readStore();
 });
 
-// 4. getSessionsFromStore
+// 2. getSessionsFromStore
 const { ms: getSessionsMs, result: sessions } = measure('getSessionsFromStore', () => {
   return getSessionsFromStore(store);
 });
 
-// 5. refreshSessionRegistry
+// 3. refreshSessionRegistry
 const { ms: registryMs } = measure('refreshSessionRegistry', () => {
   refreshSessionRegistry();
 });
 
-// 5b. Count registry entries & existsSync calls
+// 3b. Count registry entries & existsSync calls
 const PROJECTS_DIR = join(homedir(), '.claude', 'projects');
 let totalEntries = 0;
 let existingEntries = 0;
@@ -76,7 +65,7 @@ const { ms: registryDetailMs } = measure('refreshSessionRegistry (detailed)', ()
   }
 });
 
-// 6. syncTranscripts (including getLastAssistantMessage)
+// 4. syncTranscripts (including getLastAssistantMessage)
 const transcriptTimes: { sessionId: string; ms: number; fileSize: number; lines: number }[] = [];
 const { ms: syncTranscriptsMs } = measure('syncTranscripts', () => {
   for (const session of sessions) {
@@ -109,15 +98,13 @@ const { ms: syncTranscriptsMs } = measure('syncTranscripts', () => {
   }
 });
 
-// 7. Full getSessions()
+// 5. Full getSessions()
 const { ms: getSessionsFullMs } = measure('getSessions (full)', () => {
   return getSessions();
 });
 
 // Print results
 console.log('--- Individual timings ---');
-console.log(`syncCodexSessionsOnce:    ${codexMs.toFixed(1)}ms`);
-console.log(`syncTmuxSessionsOnce:     ${tmuxMs.toFixed(1)}ms`);
 console.log(`readStore:                ${readStoreMs.toFixed(1)}ms`);
 console.log(`getSessionsFromStore:     ${getSessionsMs.toFixed(1)}ms`);
 console.log(`refreshSessionRegistry:   ${registryMs.toFixed(1)}ms`);
@@ -142,5 +129,5 @@ console.log(`\n--- Full getSessions() ---`);
 console.log(`getSessions (full):       ${getSessionsFullMs.toFixed(1)}ms`);
 
 console.log(`\n--- Total startup estimate ---`);
-const totalMs = codexMs + tmuxMs + getSessionsFullMs;
-console.log(`Total (codex + tmux + getSessions): ${totalMs.toFixed(1)}ms`);
+const totalMs = getSessionsFullMs;
+console.log(`Total (getSessions): ${totalMs.toFixed(1)}ms`);

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import type { Session } from '../types/index.js';
-import { findPaneByCwd, findPaneByTty } from './tmux.js';
+import { findPaneByTty } from './tmux.js';
 
 /**
  * Validate TTY path format.
@@ -78,8 +78,7 @@ export function focusSession(tty: string): boolean {
 }
 
 /**
- * Focus a session by context (TTY if available, otherwise by tmux cwd).
- * Intended to support Codex sessions which do not provide TTY.
+ * Focus a session by context: tmux_target (Codex N-key) or TTY (Claude Code).
  */
 export function focusSessionByContext(session: Session): boolean {
   if (session.tmux_target) {
@@ -94,15 +93,7 @@ export function focusSessionByContext(session: Session): boolean {
     return true;
   }
 
-  if (!isLinux()) return false;
-  if (!isTmuxAvailable()) return false;
-
-  const updatedAtMs = Date.parse(session.updated_at);
-  const targetTimeMs = Number.isNaN(updatedAtMs) ? undefined : updatedAtMs;
-  const pane = findPaneByCwd(session.cwd, /codex/i, targetTimeMs);
-  if (!pane) return false;
-
-  return focusTmuxPane(pane.target);
+  return false;
 }
 
 /**

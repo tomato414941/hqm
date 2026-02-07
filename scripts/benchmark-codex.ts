@@ -76,19 +76,7 @@ console.log(`JSON parsing: ${parseMs.toFixed(1)}ms (${parsedEntries} entries)`);
 console.log(`  updateSession calls:     ${updateSessionCalls}`);
 console.log(`  updateLastMessage calls: ${updateLastMessageCalls}`);
 
-// Step 4: Actual syncCodexSessionsOnce (full)
-console.log('\n--- Full syncCodexSessionsOnce ---');
-const t3 = performance.now();
-const { syncCodexSessionsOnce } = await import('../src/codex/ingest.js');
-const importMs = performance.now() - t3;
-console.log(`Module import: ${importMs.toFixed(1)}ms`);
-
-const t4 = performance.now();
-syncCodexSessionsOnce();
-const syncMs = performance.now() - t4;
-console.log(`syncCodexSessionsOnce: ${syncMs.toFixed(1)}ms`);
-
-// Step 5: Per-file breakdown
+// Step 4: Per-file breakdown
 console.log('\n--- Per-file sizes ---');
 for (const f of files) {
   const stat = statSync(f);

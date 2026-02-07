@@ -102,7 +102,6 @@ export function updateSessionInStore(
     initial_cwd: existing?.initial_cwd ?? event.cwd,
     tty: event.tty ?? existing?.tty,
     agent: existing?.agent ?? (isCodexSessionId(event.session_id) ? 'codex' : 'claude'),
-    source: existing?.source,
     tmux_target: existing?.tmux_target,
     tmux_pane_id: existing?.tmux_pane_id,
     status: determineStatus(event, existing?.status),

@@ -24,7 +24,6 @@ export interface Session {
   initial_cwd: string;
   tty?: string;
   agent?: 'claude' | 'codex';
-  source?: 'tmux';
   tmux_target?: string;
   tmux_pane_id?: string;
   status: SessionStatus;

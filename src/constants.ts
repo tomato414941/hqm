@@ -23,12 +23,6 @@ export const WRITE_DEBOUNCE_MS = 100;
 /** Periodic refresh interval for timeout detection in milliseconds (60 seconds) */
 export const SESSION_REFRESH_INTERVAL_MS = 60_000;
 
-/** Periodic refresh interval for tmux session scan in milliseconds (10 seconds) */
-export const TMUX_REFRESH_INTERVAL_MS = 10_000;
-
-/** Time window for tmux-based inference (48 hours) */
-export const TMUX_INFERENCE_WINDOW_MS = 48 * 60 * 60 * 1000;
-
 /** Hook event types supported by Claude Code */
 export const HOOK_EVENTS = [
   'SessionStart',

@@ -1,11 +1,8 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { isCodexSessionId } from '../codex/paths.js';
 import type { DisplayOrderItem, HookEvent, Project, Session, StoreData } from '../types/index.js';
 import { logger } from '../utils/logger.js';
-import { parseISOTimestamp } from '../utils/time.js';
-import { listTmuxPanesDetails, type TmuxPaneDetails } from '../utils/tmux.js';
 import { isValidStoreData } from '../utils/type-guards.js';
 import {
   addSessionToDisplayOrder,
@@ -14,7 +11,6 @@ import {
   getDisplayOrderFromStore,
   getSessionProjectFromStore,
   moveSessionInDisplayOrder,
-  removeSessionFromDisplayOrder,
   reorderProjectInStore,
   UNGROUPED_PROJECT_ID,
 } from './display-order.js';
@@ -50,9 +46,6 @@ export { flushPendingWrites, resetStoreCache } from './write-cache.js';
 
 const STORE_DIR = join(homedir(), '.hqm');
 const STORE_FILE = join(STORE_DIR, 'sessions.json');
-const TMUX_SESSION_PREFIX = 'tmux-';
-const TMUX_SYNC_THROTTLE_MS = 1000;
-let lastTmuxSyncAt = 0;
 
 // Initialize write cache with store paths
 initWriteCache(STORE_DIR, STORE_FILE);
@@ -70,45 +63,6 @@ function getEmptyStoreData(): StoreData {
     displayOrder: [{ type: 'project', id: UNGROUPED_PROJECT_ID }],
     updated_at: new Date().toISOString(),
   };
-}
-
-type AgentType = 'claude' | 'codex';
-
-function detectAgentFromCommand(command: string): AgentType | null {
-  const normalized = command.toLowerCase();
-  if (normalized.includes('codex')) return 'codex';
-  if (normalized.includes('claude')) return 'claude';
-  return null;
-}
-
-function buildTmuxSessionId(paneId: string, tty: string, target: string): string {
-  const cleanedPaneId = paneId.replace(/^%+/, '');
-  if (cleanedPaneId) return `${TMUX_SESSION_PREFIX}${cleanedPaneId}`;
-  if (tty) {
-    return `${TMUX_SESSION_PREFIX}${tty.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
-  }
-  return `${TMUX_SESSION_PREFIX}${target.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
-}
-
-function resolveUpdatedAt(existing: string | undefined, lastActiveSeconds: number): string {
-  const candidate =
-    lastActiveSeconds > 0 ? new Date(lastActiveSeconds * 1000).toISOString() : undefined;
-
-  if (!existing) {
-    return candidate ?? new Date().toISOString();
-  }
-
-  if (!candidate) return existing;
-
-  const existingMs = parseISOTimestamp(existing);
-  if (existingMs === null) return candidate;
-
-  return Date.parse(candidate) > existingMs ? candidate : existing;
-}
-
-function detectAgentFromSession(session: Session): AgentType {
-  if (session.agent) return session.agent;
-  return isCodexSessionId(session.session_id) ? 'codex' : 'claude';
 }
 
 export function readStore(): StoreData {
@@ -143,194 +97,6 @@ export function readStore(): StoreData {
 
 export function writeStore(data: StoreData): void {
   scheduleWrite(data);
-}
-
-export function syncTmuxSessionsOnce(): void {
-  const panes = listTmuxPanesDetails();
-  if (panes.length === 0) return;
-
-  const store = readStore();
-  let hasChanges = false;
-
-  const stats = {
-    panes: panes.length,
-    agentPanes: 0,
-    hookSessions: 0,
-    matched: 0,
-    updatedExisting: 0,
-    createdTmux: 0,
-    removedTmux: 0,
-    skippedTty: 0,
-    skippedOld: 0,
-  };
-
-  const nonTmuxTtys = new Set<string>();
-  for (const session of Object.values(store.sessions)) {
-    if (session.tty && session.source !== 'tmux') {
-      nonTmuxTtys.add(session.tty);
-      stats.hookSessions += 1;
-    }
-  }
-
-  const panesByTty = new Map<string, TmuxPaneDetails>();
-
-  for (const pane of panes) {
-    if (pane.tty) {
-      panesByTty.set(pane.tty, pane);
-    }
-    const agent = detectAgentFromCommand(pane.command);
-    if (agent) {
-      stats.agentPanes += 1;
-    }
-  }
-
-  const usedPaneIds = new Set<string>();
-
-  for (const [key, session] of Object.entries(store.sessions)) {
-    if (session.source === 'tmux') continue;
-
-    let updated = false;
-    const agent = detectAgentFromSession(session);
-    if (!session.agent) {
-      session.agent = agent;
-      updated = true;
-    }
-
-    let pane: TmuxPaneDetails | undefined;
-    if (session.tty) {
-      pane = panesByTty.get(session.tty);
-    }
-    if (!pane) {
-      if (updated) {
-        store.sessions[key] = session;
-        hasChanges = true;
-      }
-      continue;
-    }
-
-    usedPaneIds.add(pane.paneId);
-    stats.matched += 1;
-
-    if (!session.tty && pane.tty) {
-      session.tty = pane.tty;
-      updated = true;
-    }
-    if (session.tmux_target !== pane.target) {
-      session.tmux_target = pane.target;
-      updated = true;
-    }
-    if (session.tmux_pane_id !== pane.paneId) {
-      session.tmux_pane_id = pane.paneId;
-      updated = true;
-    }
-
-    if (updated) {
-      store.sessions[key] = session;
-      hasChanges = true;
-      stats.updatedExisting += 1;
-    }
-  }
-
-  const activeTmuxSessionIds = new Set<string>();
-
-  for (const pane of panes) {
-    const agent = detectAgentFromCommand(pane.command);
-    if (!agent) continue;
-
-    // Codex sessions are only created via N key (registerCodexSession)
-    if (agent === 'codex') continue;
-
-    if (usedPaneIds.has(pane.paneId)) {
-      continue;
-    }
-
-    if (pane.tty && nonTmuxTtys.has(pane.tty)) {
-      stats.skippedTty += 1;
-      continue;
-    }
-
-    const sessionId = buildTmuxSessionId(pane.paneId, pane.tty, pane.target);
-    if (!sessionId) continue;
-    activeTmuxSessionIds.add(sessionId);
-
-    const existing = store.sessions[sessionId];
-    const updatedAt = resolveUpdatedAt(existing?.updated_at, pane.lastActive);
-    const cwd = pane.cwd || existing?.cwd || process.cwd();
-    const initialCwd = existing?.initial_cwd ?? cwd;
-
-    const session: Session = {
-      session_id: sessionId,
-      cwd,
-      initial_cwd: initialCwd,
-      tty: pane.tty || existing?.tty,
-      agent,
-      source: 'tmux',
-      tmux_target: pane.target,
-      tmux_pane_id: pane.paneId,
-      status: 'running',
-      created_at: existing?.created_at ?? updatedAt,
-      updated_at: updatedAt,
-      last_prompt: existing?.last_prompt,
-      current_tool: existing?.current_tool,
-      notification_type: existing?.notification_type,
-      lastMessage: existing?.lastMessage,
-    };
-
-    const changed =
-      !existing ||
-      existing.cwd !== session.cwd ||
-      existing.initial_cwd !== session.initial_cwd ||
-      existing.tty !== session.tty ||
-      existing.agent !== session.agent ||
-      existing.source !== session.source ||
-      existing.tmux_target !== session.tmux_target ||
-      existing.tmux_pane_id !== session.tmux_pane_id ||
-      existing.status !== session.status ||
-      existing.updated_at !== session.updated_at;
-
-    if (changed) {
-      store.sessions[sessionId] = session;
-      hasChanges = true;
-    }
-
-    if (!existing) {
-      addSessionToDisplayOrder(store, sessionId);
-      hasChanges = true;
-      stats.createdTmux += 1;
-    }
-  }
-
-  for (const [key, session] of Object.entries(store.sessions)) {
-    if (session.source === 'tmux' && !activeTmuxSessionIds.has(session.session_id)) {
-      delete store.sessions[key];
-      removeSessionFromDisplayOrder(store, key);
-      hasChanges = true;
-      stats.removedTmux += 1;
-    }
-  }
-
-  const logEnabled = (() => {
-    const flag = process.env.HQM_TMUX_LOG;
-    if (!flag) return false;
-    return flag === '1' || flag.toLowerCase() === 'true';
-  })();
-
-  if (logEnabled || hasChanges) {
-    logger.debug('tmux-sync', stats);
-  }
-
-  if (hasChanges) {
-    writeStore(store);
-  }
-}
-
-export function syncTmuxSessionsIfNeeded(): void {
-  const now = Date.now();
-  if (now - lastTmuxSyncAt < TMUX_SYNC_THROTTLE_MS) {
-    return;
-  }
-  lastTmuxSyncAt = now;
-  syncTmuxSessionsOnce();
 }
 
 // Session operations

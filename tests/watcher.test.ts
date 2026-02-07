@@ -19,8 +19,6 @@ vi.mock('../src/store/file-store.js', () => ({
   getSessions: () => mockGetSessions(),
   getProjects: () => mockGetProjects(),
   getStorePath: () => '/tmp/sessions.json',
-  syncTmuxSessionsOnce: vi.fn(),
-  syncTmuxSessionsIfNeeded: vi.fn(),
   cleanupStaleSessions: vi.fn().mockResolvedValue(undefined),
 }));
 
