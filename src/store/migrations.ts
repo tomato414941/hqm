@@ -1,4 +1,4 @@
-import type { DisplayOrderItem, Session, StoreData } from '../types/index.js';
+import type { DisplayOrderItem, Project, Session, StoreData } from '../types/index.js';
 import { logDisplayOrderChange } from '../utils/display-order-log.js';
 
 export const UNGROUPED_PROJECT_ID = '';
@@ -31,12 +31,17 @@ export function migrateToDisplayOrder(store: StoreData): void {
   }
 
   // Add named projects (sorted by their order property, then by name)
-  const sortedProjects = Object.values(store.projects || {}).sort((a, b) => {
-    const orderA = a.order ?? Number.MAX_SAFE_INTEGER;
-    const orderB = b.order ?? Number.MAX_SAFE_INTEGER;
-    if (orderA !== orderB) return orderA - orderB;
-    return a.name.localeCompare(b.name);
-  });
+  interface OldProject extends Project {
+    order?: number;
+  }
+  const sortedProjects = Object.values((store.projects || {}) as Record<string, OldProject>).sort(
+    (a, b) => {
+      const orderA = a.order ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.order ?? Number.MAX_SAFE_INTEGER;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    }
+  );
 
   for (const project of sortedProjects) {
     order.push({ type: 'project', id: project.id });

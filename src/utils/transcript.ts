@@ -271,7 +271,6 @@ export function getAllMessages(
   }
 }
 
-// Keep backward compatibility alias
 interface TranscriptMessage {
   type: 'user' | 'assistant' | 'result';
   message?: {

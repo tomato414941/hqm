@@ -41,7 +41,6 @@ export interface Project {
   id: string;
   name: string;
   created_at: string;
-  order?: number;
 }
 
 // Display order item (project or session)

@@ -44,11 +44,3 @@ export function endPerf(span: PerfSpan | null, data?: Record<string, unknown>): 
     ...data,
   });
 }
-
-export function logPerfEvent(event: string, data?: Record<string, unknown>): void {
-  writePerf({
-    timestamp: new Date().toISOString(),
-    event,
-    ...data,
-  });
-}

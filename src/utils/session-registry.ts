@@ -87,28 +87,3 @@ export function getTranscriptPathFromRegistry(sessionId: string): string | undef
   }
   return registry.get(sessionId);
 }
-
-/**
- * Force refresh and get path
- */
-export function getTranscriptPathFresh(sessionId: string): string | undefined {
-  refreshSessionRegistry();
-  return registry.get(sessionId);
-}
-
-/**
- * Get all session IDs in the registry
- */
-export function getAllSessionIds(): string[] {
-  if (Date.now() - lastRefresh > SESSION_REGISTRY_CACHE_TTL_MS) {
-    refreshSessionRegistry();
-  }
-  return Array.from(registry.keys());
-}
-
-/**
- * Get registry size (for debugging)
- */
-export function getRegistrySize(): number {
-  return registry.size;
-}

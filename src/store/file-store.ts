@@ -37,11 +37,7 @@ import {
 import { syncTranscripts } from './transcript-sync.js';
 import { getCachedStore, initWriteCache, scheduleWrite } from './write-cache.js';
 
-// Re-export for backward compatibility
-export { getSessionKey } from '../utils/session-key.js';
-export { determineStatus } from '../utils/session-status.js';
-export { isTtyAliveAsync } from '../utils/tty.js';
-export { UNGROUPED_PROJECT_ID } from './display-order.js';
+// Re-export write-cache utilities
 export { flushPendingWrites, resetStoreCache } from './write-cache.js';
 
 const STORE_DIR = join(homedir(), '.hqm');

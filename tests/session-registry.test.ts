@@ -85,25 +85,25 @@ describe('session-registry', () => {
       existsSyncMock.mockReturnValue(true);
       readdirSyncMock.mockReturnValue([]);
 
-      const { refreshSessionRegistry, getRegistrySize } = await import(
+      const { refreshSessionRegistry, getTranscriptPathFromRegistry } = await import(
         '../src/utils/session-registry.js'
       );
 
       refreshSessionRegistry();
 
-      expect(getRegistrySize()).toBe(0);
+      expect(getTranscriptPathFromRegistry('any-session')).toBeUndefined();
     });
 
     it('handles missing projects directory', async () => {
       existsSyncMock.mockReturnValue(false);
 
-      const { refreshSessionRegistry, getRegistrySize } = await import(
+      const { refreshSessionRegistry, getTranscriptPathFromRegistry } = await import(
         '../src/utils/session-registry.js'
       );
 
       refreshSessionRegistry();
 
-      expect(getRegistrySize()).toBe(0);
+      expect(getTranscriptPathFromRegistry('any-session')).toBeUndefined();
     });
 
     it('skips invalid sessions-index.json files', async () => {
@@ -118,13 +118,13 @@ describe('session-registry', () => {
 
       readFileSyncMock.mockReturnValue('invalid json {{{');
 
-      const { refreshSessionRegistry, getRegistrySize } = await import(
+      const { refreshSessionRegistry, getTranscriptPathFromRegistry } = await import(
         '../src/utils/session-registry.js'
       );
 
       refreshSessionRegistry();
 
-      expect(getRegistrySize()).toBe(0);
+      expect(getTranscriptPathFromRegistry('any-session')).toBeUndefined();
     });
 
     it('skips entries where transcript file does not exist', async () => {
@@ -191,76 +191,6 @@ describe('session-registry', () => {
       refreshSessionRegistry();
       const result = getTranscriptPathFromRegistry('session-1');
       expect(result).toBe('/home/dev/.claude/projects/-home-dev-project1/session-1.jsonl');
-    });
-  });
-
-  describe('getAllSessionIds', () => {
-    it('returns all session IDs in the registry', async () => {
-      existsSyncMock.mockImplementation((path: string) => {
-        if (path.includes('.claude/projects')) return true;
-        if (path.includes('sessions-index.json')) return true;
-        if (path.endsWith('.jsonl')) return true;
-        return false;
-      });
-
-      readdirSyncMock.mockReturnValue(['-home-dev-project1']);
-
-      readFileSyncMock.mockReturnValue(
-        JSON.stringify({
-          version: 1,
-          entries: [
-            {
-              sessionId: 'session-a',
-              fullPath: '/home/dev/.claude/projects/-home-dev-project1/session-a.jsonl',
-            },
-            {
-              sessionId: 'session-b',
-              fullPath: '/home/dev/.claude/projects/-home-dev-project1/session-b.jsonl',
-            },
-          ],
-        })
-      );
-
-      const { refreshSessionRegistry, getAllSessionIds } = await import(
-        '../src/utils/session-registry.js'
-      );
-
-      refreshSessionRegistry();
-
-      const ids = getAllSessionIds();
-      expect(ids).toContain('session-a');
-      expect(ids).toContain('session-b');
-      expect(ids).toHaveLength(2);
-    });
-  });
-
-  describe('getTranscriptPathFresh', () => {
-    it('forces refresh and returns path', async () => {
-      existsSyncMock.mockImplementation((path: string) => {
-        if (path.includes('.claude/projects')) return true;
-        if (path.includes('sessions-index.json')) return true;
-        if (path.endsWith('.jsonl')) return true;
-        return false;
-      });
-
-      readdirSyncMock.mockReturnValue(['-home-dev-project1']);
-
-      readFileSyncMock.mockReturnValue(
-        JSON.stringify({
-          version: 1,
-          entries: [
-            {
-              sessionId: 'session-new',
-              fullPath: '/home/dev/.claude/projects/-home-dev-project1/session-new.jsonl',
-            },
-          ],
-        })
-      );
-
-      const { getTranscriptPathFresh } = await import('../src/utils/session-registry.js');
-
-      const result = getTranscriptPathFresh('session-new');
-      expect(result).toBe('/home/dev/.claude/projects/-home-dev-project1/session-new.jsonl');
     });
   });
 });

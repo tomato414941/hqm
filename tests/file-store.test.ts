@@ -62,18 +62,9 @@ describe('file-store', () => {
     }
   });
 
-  describe('getSessionKey', () => {
-    it('should return session_id only', async () => {
-      const { getSessionKey } = await import('../src/store/file-store.js');
-      expect(getSessionKey('abc123')).toBe('abc123');
-    });
-  });
-
-  // Note: isTtyAliveAsync is tested in tty-cache.test.ts
-
   describe('determineStatus', () => {
     it('should return stopped on Stop event', async () => {
-      const { determineStatus } = await import('../src/store/file-store.js');
+      const { determineStatus } = await import('../src/utils/session-status.js');
       const event: HookEvent = {
         session_id: 'test',
         cwd: '/tmp',
@@ -85,7 +76,7 @@ describe('file-store', () => {
     });
 
     it('should return running on UserPromptSubmit event even if stopped', async () => {
-      const { determineStatus } = await import('../src/store/file-store.js');
+      const { determineStatus } = await import('../src/utils/session-status.js');
       const event: HookEvent = {
         session_id: 'test',
         cwd: '/tmp',
@@ -96,7 +87,7 @@ describe('file-store', () => {
     });
 
     it('should keep stopped state for other events', async () => {
-      const { determineStatus } = await import('../src/store/file-store.js');
+      const { determineStatus } = await import('../src/utils/session-status.js');
       const event: HookEvent = {
         session_id: 'test',
         cwd: '/tmp',
@@ -106,7 +97,7 @@ describe('file-store', () => {
     });
 
     it('should return running on PreToolUse event', async () => {
-      const { determineStatus } = await import('../src/store/file-store.js');
+      const { determineStatus } = await import('../src/utils/session-status.js');
       const event: HookEvent = {
         session_id: 'test',
         cwd: '/tmp',
@@ -117,7 +108,7 @@ describe('file-store', () => {
     });
 
     it('should return waiting_input on Notification with permission_prompt', async () => {
-      const { determineStatus } = await import('../src/store/file-store.js');
+      const { determineStatus } = await import('../src/utils/session-status.js');
       const event: HookEvent = {
         session_id: 'test',
         cwd: '/tmp',
@@ -128,7 +119,7 @@ describe('file-store', () => {
     });
 
     it('should return running on Notification without permission_prompt', async () => {
-      const { determineStatus } = await import('../src/store/file-store.js');
+      const { determineStatus } = await import('../src/utils/session-status.js');
       const event: HookEvent = {
         session_id: 'test',
         cwd: '/tmp',
@@ -139,7 +130,7 @@ describe('file-store', () => {
     });
 
     it('should keep existing status on idle_prompt notification', async () => {
-      const { determineStatus } = await import('../src/store/file-store.js');
+      const { determineStatus } = await import('../src/utils/session-status.js');
       const event: HookEvent = {
         session_id: 'test',
         cwd: '/tmp',

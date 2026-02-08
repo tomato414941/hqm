@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { isCodexSessionId } from '../codex/paths.js';
 import type { HookEvent, Session, StoreData } from '../types/index.js';
 import { endPerf, startPerf } from '../utils/perf.js';
-import { getSessionKey } from '../utils/session-key.js';
 import { determineStatus } from '../utils/session-status.js';
 import { parseISOTimestamp } from '../utils/time.js';
 import { getSessionTimeoutMs } from './config.js';
@@ -77,7 +76,7 @@ export function updateSessionInStore(
   event: HookEvent,
   writeStore: (data: StoreData) => void
 ): Session {
-  const key = getSessionKey(event.session_id);
+  const key = event.session_id;
   const now = new Date().toISOString();
 
   const existing = store.sessions[key];
@@ -201,8 +200,7 @@ export async function cleanupStaleSessionsInStore(
  * Get a single session by ID
  */
 export function getSessionFromStore(store: StoreData, sessionId: string): Session | undefined {
-  const key = getSessionKey(sessionId);
-  return store.sessions[key];
+  return store.sessions[sessionId];
 }
 
 /**
@@ -213,9 +211,8 @@ export function removeSessionFromStore(
   sessionId: string,
   writeStore: (data: StoreData) => void
 ): void {
-  const key = getSessionKey(sessionId);
-  delete store.sessions[key];
-  removeSessionFromDisplayOrder(store, key);
+  delete store.sessions[sessionId];
+  removeSessionFromDisplayOrder(store, sessionId);
   writeStore(store);
 }
 

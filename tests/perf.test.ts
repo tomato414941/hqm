@@ -39,15 +39,6 @@ describe('perf (HQM_PROFILE not set)', () => {
     expect(() => endPerf(null)).not.toThrow();
     expect(appendFileSyncMock).not.toHaveBeenCalled();
   });
-
-  it('logPerfEvent does nothing when profiling is disabled', async () => {
-    const { logPerfEvent } = await import('../src/utils/perf.js');
-
-    logPerfEvent('test_event', { key: 'value' });
-
-    expect(mkdirSyncMock).not.toHaveBeenCalled();
-    expect(appendFileSyncMock).not.toHaveBeenCalled();
-  });
 });
 
 describe('perf (HQM_PROFILE=1)', () => {
@@ -102,30 +93,15 @@ describe('perf (HQM_PROFILE=1)', () => {
     expect(parsed.pid).toBe(process.pid);
   });
 
-  it('logPerfEvent writes event to file', async () => {
-    const { logPerfEvent } = await import('../src/utils/perf.js');
-
-    logPerfEvent('custom_event', { custom: 'data' });
-
-    expect(mkdirSyncMock).toHaveBeenCalled();
-    expect(appendFileSyncMock).toHaveBeenCalledTimes(1);
-
-    const writtenData = appendFileSyncMock.mock.calls[0][1] as string;
-    const parsed = JSON.parse(writtenData.trim());
-    expect(parsed.event).toBe('custom_event');
-    expect(parsed.custom).toBe('data');
-    expect(parsed.timestamp).toBeDefined();
-    expect(parsed.pid).toBe(process.pid);
-  });
-
   it('does not throw when mkdirSync fails', async () => {
     mkdirSyncMock.mockImplementation(() => {
       throw new Error('Permission denied');
     });
 
-    const { logPerfEvent } = await import('../src/utils/perf.js');
+    const { startPerf, endPerf } = await import('../src/utils/perf.js');
+    const span = startPerf('test_event');
 
-    expect(() => logPerfEvent('test_event')).not.toThrow();
+    expect(() => endPerf(span)).not.toThrow();
   });
 
   it('does not throw when appendFileSync fails', async () => {
@@ -133,9 +109,10 @@ describe('perf (HQM_PROFILE=1)', () => {
       throw new Error('Disk full');
     });
 
-    const { logPerfEvent } = await import('../src/utils/perf.js');
+    const { startPerf, endPerf } = await import('../src/utils/perf.js');
+    const span = startPerf('test_event');
 
-    expect(() => logPerfEvent('test_event')).not.toThrow();
+    expect(() => endPerf(span)).not.toThrow();
   });
 
   it('endPerf includes span data and additional data', async () => {
