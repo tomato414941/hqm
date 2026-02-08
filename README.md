@@ -6,7 +6,7 @@ A TUI/Web dashboard for monitoring multiple Claude Code and Codex sessions in re
 
 - **TUI Dashboard**: Terminal-based interface using Ink/React
 - **Mobile Web UI**: Monitor sessions from your phone via QR code
-- **Real-time Updates**: Watches session activity via Claude Code hooks and Codex local logs
+- **Real-time Updates**: Watches session activity via Claude Code hooks
 - **Session Management**: View status, current tool, and messages for each session
 - **Project Management**: Organize sessions into projects
 
@@ -26,7 +26,7 @@ hqm setup
 
 This adds hooks to `~/.claude/settings.json`.
 
-Codex sessions are detected automatically from local Codex logs (no setup required).
+Codex sessions can be launched directly from the dashboard with `N` key (no separate setup required).
 
 ## Usage
 
@@ -47,6 +47,8 @@ hqm
 | `d` | Delete session/project |
 | `p` | Toggle project management mode |
 | `a` | Assign selected session to a project |
+| `n` | Launch new Claude Code session |
+| `N` | Launch new Codex session |
 | `q/Esc` | Quit |
 
 ### Mobile Web UI
@@ -71,20 +73,6 @@ Scan the QR code with your phone to access the web interface.
 | `hqm clear all` | Clear both sessions and projects |
 | `hqm setup` | Register hooks with Claude Code |
 | `hqm config timeout [min]` | Get/set session timeout (0=disabled) |
-| `hqm config summary` | Manage AI summary (see below) |
-
-### AI Summary
-
-Generate automatic summaries when sessions end using Claude API.
-
-```bash
-hqm config summary setup     # Configure API key
-hqm config summary enable    # Enable summaries
-hqm config summary disable   # Disable summaries
-hqm config summary           # Show current config
-```
-
-Requires an Anthropic API key. Uses `claude-haiku-4-20250514` by default.
 
 ## Requirements
 
@@ -95,13 +83,11 @@ Requires an Anthropic API key. Uses `claude-haiku-4-20250514` by default.
 
 ## Codex Support
 
-HQM reads Codex session logs from your local Codex state directory (`CODEX_HOME`, defaults to `~/.codex`).
-Because Codex does not expose hook events, session end detection relies on inactivity timeout
-(`hqm config timeout`) if you want sessions to auto-expire.
+Codex sessions can be launched directly from the HQM dashboard by pressing `N`.
+HQM creates a new tmux window running `codex`, registers the session, and tracks its transcript
+from the local Codex state directory (`CODEX_HOME`, defaults to `~/.codex`).
 
-Set `HQM_DISABLE_CODEX=1` to disable Codex log ingestion.
-To avoid scanning old Codex logs on startup, set `HQM_CODEX_RECENT_MINUTES` (or set a non-zero
-`hqm config timeout`, which is used as the default active window when the env var is not set).
+Set `HQM_DISABLE_CODEX=1` to disable Codex support.
 
 ## Credits
 

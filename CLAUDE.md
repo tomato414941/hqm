@@ -33,8 +33,7 @@ Claude Code triggers hooks → `hqm hook <event>` CLI receives JSON via stdin �
 Supported hook events: `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Notification`, `Stop`
 
 ### Codex Flow
-Codex writes JSONL logs under `~/.codex/sessions` → `codex/ingest.ts` tails log updates → `file-store.ts` updates `~/.hqm/sessions.json`
-Startup ingestion can be limited with `HQM_CODEX_RECENT_MINUTES` (or non-zero `hqm config timeout`).
+Dashboard `N` key → `createNewSession('codex')` opens tmux window → `registerCodexSession()` in `file-store.ts` creates session entry → `codex/registry.ts` maps session IDs to transcript paths under `~/.codex/sessions/`
 
 ### TUI Flow
 `Dashboard.tsx` renders with Ink → `useSessions.ts` watches `sessions.json` with chokidar → `SessionCard.tsx` displays each session
@@ -97,8 +96,7 @@ Config is stored in `~/.hqm/config.json`.
 - `findBestPaneMatch` (CWD-score-based tmux pane matching) is **Codex-only**. Claude Code always provides TTY via hooks, so CWD fallback is unnecessary. Codex sessions ingested from JONL logs may lack TTY.
 
 ### Improvement backlog (priority order)
-1. **Log infrastructure** (#17): Unified logger, levels, rotation. Prerequisite for other improvements.
-2. Error notification UI (#11): Surface transcript/tmux errors to user. Build on #17.
-3. Session auto-archive (#14): Archive instead of delete. Long-term stability.
-4. Status filtering (#8): Toggle running/waiting/stopped visibility. Low effort.
-5. Command detection bypass fix (#18): Move from regex to parser-based validation.
+1. Error notification UI (#11): Surface transcript/tmux errors to user.
+2. Session auto-archive (#14): Archive instead of delete. Long-term stability.
+3. Status filtering (#8): Toggle running/waiting/stopped visibility. Low effort.
+4. Command detection bypass fix (#18): Move from regex to parser-based validation.
