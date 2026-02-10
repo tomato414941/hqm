@@ -25,6 +25,7 @@ export const VALID_HOOK_EVENTS: ReadonlySet<string> = new Set<HookEventName>([
   'Notification',
   'Stop',
   'UserPromptSubmit',
+  'SessionEnd',
 ]);
 
 /**

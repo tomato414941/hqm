@@ -142,6 +142,7 @@ describe('hooks', () => {
         'PostToolUse',
         'Notification',
         'Stop',
+        'SessionEnd',
       ]);
       expect(result.toSkip).toEqual([]);
     });
@@ -150,7 +151,7 @@ describe('hooks', () => {
       const settings: Settings = { hooks: {} };
       const result = categorizeHooks(settings);
 
-      expect(result.toAdd).toHaveLength(6);
+      expect(result.toAdd).toHaveLength(7);
       expect(result.toSkip).toHaveLength(0);
     });
 
@@ -217,12 +218,18 @@ describe('hooks', () => {
               hooks: [{ type: 'command', command: 'hqm hook Stop' }],
             },
           ],
+          SessionEnd: [
+            {
+              matcher: '',
+              hooks: [{ type: 'command', command: 'hqm hook SessionEnd' }],
+            },
+          ],
         },
       };
       const result = categorizeHooks(settings);
 
       expect(result.toAdd).toHaveLength(0);
-      expect(result.toSkip).toHaveLength(6);
+      expect(result.toSkip).toHaveLength(7);
     });
   });
 
@@ -356,6 +363,12 @@ describe('hooks', () => {
               hooks: [{ type: 'command', command: 'hqm hook Stop' }],
             },
           ],
+          SessionEnd: [
+            {
+              matcher: '',
+              hooks: [{ type: 'command', command: 'hqm hook SessionEnd' }],
+            },
+          ],
         },
       };
       expect(areAllHooksConfigured(settings)).toBe(true);
@@ -397,6 +410,12 @@ describe('hooks', () => {
             {
               matcher: '',
               hooks: [{ type: 'command', command: 'npx hqm hook Stop' }],
+            },
+          ],
+          SessionEnd: [
+            {
+              matcher: '',
+              hooks: [{ type: 'command', command: 'npx hqm hook SessionEnd' }],
             },
           ],
         },

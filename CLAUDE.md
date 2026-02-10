@@ -30,7 +30,7 @@ npx vitest run tests/file-store.test.ts
 ### Hook Flow
 Claude Code triggers hooks → `hqm hook <event>` CLI receives JSON via stdin → `handler.ts` validates and parses → `file-store.ts` updates `~/.hqm/sessions.json`
 
-Supported hook events: `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Notification`, `Stop`
+Supported hook events: `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Notification`, `Stop`, `SessionEnd`
 
 ### Codex Flow
 Dashboard `N` key → `createNewSession('codex')` opens tmux window → `registerCodexSession()` in `file-store.ts` creates session entry → `codex/registry.ts` maps session IDs to transcript paths under `~/.codex/sessions/`
@@ -84,9 +84,10 @@ Config is stored in `~/.hqm/config.json`.
 
 ### Hook events (important — repeated confusion has occurred)
 - `Stop` = Claude **completed a response** (fires every turn). NOT `/exit`.
-- `SessionEnd` = session terminated (`/exit`, `/clear`, logout). HQM does NOT register this hook.
+- `SessionEnd` = session terminated (`/exit`, `/clear`, logout). HQM registers this hook.
+  - `reason: 'clear'` → session preserved (continues with same ID)
+  - `reason: 'prompt_input_exit'` / `'logout'` / others → session removed from store
 - HQM's `status: 'stopped'` = "Claude finished responding, waiting for user input"
-- `/exit` can only be detected via `SessionEnd` (unregistered) or TTY close
 - Reference: https://code.claude.com/docs/en/hooks
 
 ### Removed features

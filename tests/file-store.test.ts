@@ -409,6 +409,95 @@ describe('file-store', () => {
     });
   });
 
+  describe('SessionEnd handling', () => {
+    it('should remove session on SessionEnd with reason prompt_input_exit', async () => {
+      const { updateSession, getSession } = await import('../src/store/file-store.js');
+
+      // Create a session first
+      updateSession({
+        session_id: 'exit-session',
+        cwd: '/tmp',
+        tty: '/dev/pts/1',
+        hook_event_name: 'PreToolUse',
+      });
+      expect(getSession('exit-session')).toBeDefined();
+
+      // SessionEnd with /exit reason
+      updateSession({
+        session_id: 'exit-session',
+        cwd: '/tmp',
+        tty: '/dev/pts/1',
+        hook_event_name: 'SessionEnd',
+        reason: 'prompt_input_exit',
+      });
+
+      expect(getSession('exit-session')).toBeUndefined();
+    });
+
+    it('should preserve session on SessionEnd with reason clear', async () => {
+      const { updateSession, getSession } = await import('../src/store/file-store.js');
+
+      // Create a session first
+      updateSession({
+        session_id: 'clear-session',
+        cwd: '/tmp',
+        tty: '/dev/pts/1',
+        hook_event_name: 'PreToolUse',
+      });
+      expect(getSession('clear-session')).toBeDefined();
+
+      // SessionEnd with /clear reason
+      updateSession({
+        session_id: 'clear-session',
+        cwd: '/tmp',
+        tty: '/dev/pts/1',
+        hook_event_name: 'SessionEnd',
+        reason: 'clear',
+      });
+
+      expect(getSession('clear-session')).toBeDefined();
+    });
+
+    it('should remove session on SessionEnd with reason logout', async () => {
+      const { updateSession, getSession } = await import('../src/store/file-store.js');
+
+      // Create a session first
+      updateSession({
+        session_id: 'logout-session',
+        cwd: '/tmp',
+        tty: '/dev/pts/1',
+        hook_event_name: 'PreToolUse',
+      });
+      expect(getSession('logout-session')).toBeDefined();
+
+      // SessionEnd with logout reason
+      updateSession({
+        session_id: 'logout-session',
+        cwd: '/tmp',
+        tty: '/dev/pts/1',
+        hook_event_name: 'SessionEnd',
+        reason: 'logout',
+      });
+
+      expect(getSession('logout-session')).toBeUndefined();
+    });
+
+    it('should not error on SessionEnd for non-existent session', async () => {
+      const { updateSession, getSession } = await import('../src/store/file-store.js');
+
+      // SessionEnd for a session that doesn't exist
+      const result = updateSession({
+        session_id: 'non-existent',
+        cwd: '/tmp',
+        hook_event_name: 'SessionEnd',
+        reason: 'prompt_input_exit',
+      });
+
+      expect(result).toBeUndefined();
+      expect(getSession('non-existent')).toBeUndefined();
+    });
+  });
+
   describe('removeSession', () => {
     it('should remove session by key', async () => {
       const { updateSession, removeSession, getSession } = await import(

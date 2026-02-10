@@ -159,6 +159,53 @@ describe('event-handlers', () => {
       });
     });
 
+    describe('SessionEnd', () => {
+      it('should clear current_tool', () => {
+        const event: HookEvent = {
+          session_id: 'test',
+          cwd: '/tmp',
+          hook_event_name: 'SessionEnd',
+          reason: 'prompt_input_exit',
+        };
+
+        const result = getFieldUpdates(event, {
+          current_tool: 'Bash',
+        });
+
+        expect(result.currentTool).toBeUndefined();
+      });
+
+      it('should clear notification_type', () => {
+        const event: HookEvent = {
+          session_id: 'test',
+          cwd: '/tmp',
+          hook_event_name: 'SessionEnd',
+          reason: 'prompt_input_exit',
+        };
+
+        const result = getFieldUpdates(event, {
+          notification_type: 'permission_prompt',
+        });
+
+        expect(result.notificationType).toBeUndefined();
+      });
+
+      it('should preserve last_prompt', () => {
+        const event: HookEvent = {
+          session_id: 'test',
+          cwd: '/tmp',
+          hook_event_name: 'SessionEnd',
+          reason: 'prompt_input_exit',
+        };
+
+        const result = getFieldUpdates(event, {
+          last_prompt: 'Final prompt',
+        });
+
+        expect(result.lastPrompt).toBe('Final prompt');
+      });
+    });
+
     describe('Stop', () => {
       it('should clear current_tool', () => {
         const event: HookEvent = {

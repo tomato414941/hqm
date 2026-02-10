@@ -12,6 +12,9 @@ export interface HookEvent {
   prompt?: string;
   tool_name?: string;
   source?: 'startup' | 'resume' | 'clear' | 'compact';
+  reason?: string;
+  team_name?: string;
+  agent_name?: string;
 }
 
 // Session status
@@ -34,6 +37,8 @@ export interface Session {
   current_tool?: string;
   notification_type?: string;
   lastMessage?: string;
+  team_name?: string;
+  agent_name?: string;
 }
 
 // Project for grouping sessions

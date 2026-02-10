@@ -31,6 +31,7 @@ export const HOOK_EVENTS = [
   'PostToolUse',
   'Notification',
   'Stop',
+  'SessionEnd',
 ] as const;
 
 export type HookEventName = (typeof HOOK_EVENTS)[number];

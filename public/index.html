@@ -316,6 +316,18 @@
       font-style: italic;
     }
 
+    .card-team-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-glow);
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      letter-spacing: 0.2px;
+    }
+
     .modal-waiting-notice {
       flex-shrink: 0;
       padding: 16px 20px;
@@ -1386,6 +1398,9 @@
       const statusLabel = escapeHtml(STATUS[session.status]);
       const msgPreview = escapeHtml(truncateMessage(session.lastMessage || session.last_prompt));
       const safeStatus = escapeHtml(session.status);
+      const teamBadge = session.team_name
+        ? `<span class="card-team-badge">${escapeHtml(session.team_name)}/${escapeHtml(session.agent_name || '?')}</span>`
+        : '';
 
       return `
         <div class="card ${safeStatus}" data-session-id="${escapeHtml(session.session_id)}">
@@ -1397,6 +1412,7 @@
           <div class="card-body">
             <div class="card-name">${dirName}</div>
             <div class="card-path">${shortPath}</div>
+            ${teamBadge}
             <div class="card-message">
               ${msgPreview
                 ? `<div class="card-message-text">${msgPreview}</div>`

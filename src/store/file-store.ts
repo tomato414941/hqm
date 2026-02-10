@@ -96,7 +96,7 @@ export function writeStore(data: StoreData): void {
 }
 
 // Session operations
-export function updateSession(event: HookEvent): Session {
+export function updateSession(event: HookEvent): Session | undefined {
   const store = readStore();
   return updateSessionInStore(store, event, writeStore);
 }

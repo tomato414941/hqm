@@ -4,6 +4,11 @@ import type { HookEvent, SessionStatus } from '../types/index.js';
  * Determine session status based on hook event and current status
  */
 export function determineStatus(event: HookEvent, currentStatus?: SessionStatus): SessionStatus {
+  // SessionEnd: session is ending (handled separately in session-store)
+  if (event.hook_event_name === 'SessionEnd') {
+    return currentStatus ?? 'stopped';
+  }
+
   // Explicit stop event
   if (event.hook_event_name === 'Stop') {
     return 'stopped';

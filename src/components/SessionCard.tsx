@@ -44,7 +44,9 @@ function arePropsEqual(prevProps: SessionCardProps, nextProps: SessionCardProps)
     prev.last_prompt === next.last_prompt &&
     prev.current_tool === next.current_tool &&
     prev.notification_type === next.notification_type &&
-    prev.lastMessage === next.lastMessage
+    prev.lastMessage === next.lastMessage &&
+    prev.team_name === next.team_name &&
+    prev.agent_name === next.agent_name
   );
 }
 
@@ -68,7 +70,11 @@ export const SessionCard = memo(function SessionCard({
   const shortId = truncateSessionId(session.session_id, isCodex);
   const idLabel = isCodex ? '[Codex]' : '[Claude]';
   const idText = `${idLabel} #${shortId}`;
-  const line1FixedWidth = LINE1_BASE_WIDTH + idText.length + 1; // +1 for trailing space
+  const teamBadge = session.team_name
+    ? `${session.team_name}/${session.agent_name ?? '?'}`
+    : undefined;
+  const teamBadgeWidth = teamBadge ? teamBadge.length + 1 : 0; // +1 for trailing space
+  const line1FixedWidth = LINE1_BASE_WIDTH + idText.length + 1 + teamBadgeWidth; // +1 for trailing space
   const maxDirLength = Math.max(MIN_CONTENT_LENGTH, terminalColumns - line1FixedWidth);
   const maxLineLength = Math.max(MIN_CONTENT_LENGTH, terminalColumns - LINE_INDENT_WIDTH);
   const dir = truncateText(abbreviateHomePath(session.cwd), maxDirLength);
@@ -118,6 +124,7 @@ export const SessionCard = memo(function SessionCard({
         <Text> </Text>
         <Text dimColor>{relativeTime.padEnd(8)}</Text>
         <Text color={isCodex ? 'green' : 'yellow'}>{idText} </Text>
+        {teamBadge && <Text color="magenta">{teamBadge} </Text>}
         <Text color={isSelected ? 'white' : 'gray'}>{dir}</Text>
       </Box>
       {/* Line 2: Prompt → Response */}

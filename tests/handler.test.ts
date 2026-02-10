@@ -19,6 +19,11 @@ vi.mock('../src/server/daemon-client.js', () => ({
   sendToDaemon: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
+// Mock team utility
+vi.mock('../src/utils/team.js', () => ({
+  getTeamContext: vi.fn().mockReturnValue(undefined),
+}));
+
 describe('handler', () => {
   describe('VALID_HOOK_EVENTS', () => {
     it('should contain all expected hook event names', () => {
@@ -30,8 +35,12 @@ describe('handler', () => {
       expect(VALID_HOOK_EVENTS.has('UserPromptSubmit')).toBe(true);
     });
 
-    it('should have exactly 6 valid events', () => {
-      expect(VALID_HOOK_EVENTS.size).toBe(6);
+    it('should contain SessionEnd', () => {
+      expect(VALID_HOOK_EVENTS.has('SessionEnd')).toBe(true);
+    });
+
+    it('should have exactly 7 valid events', () => {
+      expect(VALID_HOOK_EVENTS.size).toBe(7);
     });
   });
 
@@ -43,6 +52,7 @@ describe('handler', () => {
       expect(isValidHookEventName('Notification')).toBe(true);
       expect(isValidHookEventName('Stop')).toBe(true);
       expect(isValidHookEventName('UserPromptSubmit')).toBe(true);
+      expect(isValidHookEventName('SessionEnd')).toBe(true);
     });
 
     it('should return false for invalid event names', () => {
@@ -370,6 +380,94 @@ describe('handler', () => {
       // Should fallback to direct write
       expect(updateSession).toHaveBeenCalledWith(
         expect.objectContaining({ session_id: 'test-fallback' })
+      );
+    });
+
+    it('should include team context when env vars are set', async () => {
+      const { getTeamContext } = await import('../src/utils/team.js');
+      const { updateSession } = await import('../src/store/file-store.js');
+
+      vi.mocked(getTeamContext).mockReturnValue({
+        teamName: 'cleanup',
+        agentName: 'redis-removal',
+      });
+
+      const mockStdin = createMockStdin(
+        JSON.stringify({
+          session_id: 'test-team-session',
+          cwd: '/home/dev/projects/hqm',
+        })
+      );
+      Object.defineProperty(process, 'stdin', {
+        value: mockStdin,
+        writable: true,
+        configurable: true,
+      });
+
+      await handleHookEvent('PreToolUse', '/dev/pts/5');
+
+      expect(updateSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session_id: 'test-team-session',
+          team_name: 'cleanup',
+          agent_name: 'redis-removal',
+        })
+      );
+    });
+
+    it('should pass reason field for SessionEnd event', async () => {
+      const { updateSession } = await import('../src/store/file-store.js');
+
+      const mockStdin = createMockStdin(
+        JSON.stringify({
+          session_id: 'test-session-end',
+          cwd: '/tmp',
+          reason: 'prompt_input_exit',
+        })
+      );
+      Object.defineProperty(process, 'stdin', {
+        value: mockStdin,
+        writable: true,
+        configurable: true,
+      });
+
+      await handleHookEvent('SessionEnd');
+
+      expect(updateSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session_id: 'test-session-end',
+          hook_event_name: 'SessionEnd',
+          reason: 'prompt_input_exit',
+        })
+      );
+    });
+
+    it('should have undefined team fields when no team context', async () => {
+      const { getTeamContext } = await import('../src/utils/team.js');
+      const { updateSession } = await import('../src/store/file-store.js');
+
+      vi.mocked(getTeamContext).mockReturnValue(undefined);
+
+      const mockStdin = createMockStdin(
+        JSON.stringify({
+          session_id: 'test-no-team',
+          cwd: '/tmp',
+        })
+      );
+      Object.defineProperty(process, 'stdin', {
+        value: mockStdin,
+        writable: true,
+        configurable: true,
+      });
+
+      await handleHookEvent('Stop');
+
+      expect(updateSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session_id: 'test-no-team',
+          team_name: undefined,
+          agent_name: undefined,
+        })
       );
     });
   });

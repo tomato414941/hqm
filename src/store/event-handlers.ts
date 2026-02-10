@@ -59,6 +59,12 @@ const eventHandlers: Record<HookEventName, EventHandler> = {
     currentTool: undefined,
     notificationType: undefined,
   }),
+
+  SessionEnd: (_event, existing) => ({
+    lastPrompt: existing.last_prompt,
+    currentTool: undefined,
+    notificationType: undefined,
+  }),
 };
 
 /**

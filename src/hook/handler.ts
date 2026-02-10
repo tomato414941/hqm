@@ -3,6 +3,7 @@ import { flushPendingWrites, updateSession } from '../store/file-store.js';
 import type { HookEvent } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { endPerf, startPerf } from '../utils/perf.js';
+import { getTeamContext } from '../utils/team.js';
 import { isNonEmptyString, isValidHookEventName, VALID_HOOK_EVENTS } from '../utils/type-guards.js';
 
 // Re-export for backward compatibility
@@ -38,7 +39,14 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
   }
 
   // Validate optional string fields
-  const optionalStringFields = ['cwd', 'notification_type', 'prompt', 'tool_name', 'source'];
+  const optionalStringFields = [
+    'cwd',
+    'notification_type',
+    'prompt',
+    'tool_name',
+    'source',
+    'reason',
+  ];
   for (const field of optionalStringFields) {
     if (hookPayload[field] !== undefined && typeof hookPayload[field] !== 'string') {
       console.error(`Invalid ${field}: must be a string`);
@@ -47,6 +55,7 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
   }
 
   const cwd = (hookPayload.cwd as string) || process.cwd();
+  const teamCtx = getTeamContext();
   const event: HookEvent = {
     session_id: hookPayload.session_id,
     cwd,
@@ -56,6 +65,9 @@ export async function handleHookEvent(eventName: string, tty?: string): Promise<
     prompt: hookPayload.prompt as string | undefined,
     tool_name: hookPayload.tool_name as string | undefined,
     source: hookPayload.source as HookEvent['source'],
+    reason: hookPayload.reason as string | undefined,
+    team_name: teamCtx?.teamName,
+    agent_name: teamCtx?.agentName,
   };
 
   // Prefer sending to daemon via socket (single writer) with fallback to direct write

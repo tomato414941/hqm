@@ -14,6 +14,7 @@ import {
   removeSessionFromDisplayOrder,
 } from './display-order.js';
 import { getFieldUpdates } from './event-handlers.js';
+import { createProjectInStore } from './project-store.js';
 import { checkSessionsForCleanup } from './session-cleanup.js';
 
 const STORE_DIR = join(homedir(), '.hqm');
@@ -75,8 +76,25 @@ export function updateSessionInStore(
   store: StoreData,
   event: HookEvent,
   writeStore: (data: StoreData) => void
-): Session {
+): Session | undefined {
   const key = event.session_id;
+
+  // Handle SessionEnd: remove or preserve session
+  if (event.hook_event_name === 'SessionEnd') {
+    const existing = store.sessions[key];
+    if (event.reason === 'clear') {
+      // /clear: session continues with same ID, nothing to do
+      return existing;
+    }
+    // /exit, logout, etc.: remove session from store
+    if (existing) {
+      removeSessionFromDisplayOrder(store, key);
+      delete store.sessions[key];
+      writeStore(store);
+    }
+    return existing;
+  }
+
   const now = new Date().toISOString();
 
   const existing = store.sessions[key];
@@ -110,6 +128,8 @@ export function updateSessionInStore(
     current_tool: updates.currentTool,
     notification_type: updates.notificationType,
     lastMessage: existing?.lastMessage,
+    team_name: event.team_name ?? existing?.team_name,
+    agent_name: event.agent_name ?? existing?.agent_name,
   };
 
   store.sessions[key] = session;
@@ -117,8 +137,17 @@ export function updateSessionInStore(
   // Add new session to displayOrder (after ungrouped project, at the end)
   if (!existing) {
     addSessionToDisplayOrder(store, key);
-    // Inherit project from previous session on the same TTY
-    if (inheritedProjectId) {
+
+    // Team auto-grouping takes priority over TTY inheritance
+    if (event.team_name) {
+      const teamProjectName = `Team: ${event.team_name}`;
+      let teamProject = Object.values(store.projects || {}).find((p) => p.name === teamProjectName);
+      if (!teamProject) {
+        teamProject = createProjectInStore(store, teamProjectName);
+      }
+      assignSessionToProject(store, key, teamProject.id);
+    } else if (inheritedProjectId) {
+      // Inherit project from previous session on the same TTY
       assignSessionToProject(store, key, inheritedProjectId);
     }
   }
