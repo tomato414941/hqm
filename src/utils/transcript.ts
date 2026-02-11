@@ -3,7 +3,6 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { isCodexSessionId } from '../codex/paths.js';
-import { getCodexTranscriptPath } from '../codex/registry.js';
 import type { ConversationMessage } from '../types/index.js';
 import { logger } from './logger.js';
 import { getTranscriptPathFromRegistry } from './session-registry.js';
@@ -23,7 +22,9 @@ export function buildTranscriptPath(cwd: string, sessionId: string): string {
  */
 export function getTranscriptPath(sessionId: string, cwd?: string): string | undefined {
   if (isCodexSessionId(sessionId)) {
-    return getCodexTranscriptPath(sessionId);
+    // Codex transcripts are resolved via session.transcript_path
+    // (pane-based IDs don't match transcript UUIDs)
+    return undefined;
   }
 
   // Try registry first (most accurate)

@@ -1,7 +1,9 @@
-import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { isCodexSessionId } from '../codex/paths.js';
+import { resolveCodexTranscriptPath } from '../codex/registry.js';
+import { CODEX_IDLE_THRESHOLD_MS } from '../constants.js';
 import type { HookEvent, Session, StoreData } from '../types/index.js';
 import { endPerf, startPerf } from '../utils/perf.js';
 import { determineStatus } from '../utils/session-status.js';
@@ -128,6 +130,7 @@ export function updateSessionInStore(
     current_tool: updates.currentTool,
     notification_type: updates.notificationType,
     lastMessage: existing?.lastMessage,
+    transcript_path: existing?.transcript_path,
     team_name: event.team_name ?? existing?.team_name,
     agent_name: event.agent_name ?? existing?.agent_name,
   };
@@ -282,6 +285,69 @@ export function updateSessionLastMessageInStore(
     session.lastMessage = message;
     session.updated_at = updatedAt ?? new Date().toISOString();
     store.sessions[key] = session;
+    writeStore(store);
+  }
+}
+
+/**
+ * Update Codex session statuses based on transcript file activity.
+ * Codex doesn't send hooks, so we infer status from transcript mtime.
+ */
+export function updateCodexSessionStatuses(
+  store: StoreData,
+  writeStore: (data: StoreData) => void
+): void {
+  const now = Date.now();
+  let hasChanges = false;
+
+  for (const [key, session] of Object.entries(store.sessions)) {
+    if (session.agent !== 'codex') continue;
+
+    const transcriptPath = session.transcript_path || resolveCodexTranscriptPath(session);
+    if (transcriptPath && transcriptPath !== session.transcript_path) {
+      session.transcript_path = transcriptPath;
+      store.sessions[key] = session;
+      hasChanges = true;
+    }
+
+    if (transcriptPath) {
+      try {
+        const mtimeMs = statSync(transcriptPath).mtimeMs;
+        const idle = now - mtimeMs > CODEX_IDLE_THRESHOLD_MS;
+
+        if (idle && session.status === 'running') {
+          session.status = 'stopped';
+          session.updated_at = new Date().toISOString();
+          store.sessions[key] = session;
+          hasChanges = true;
+        } else if (!idle && session.status === 'stopped') {
+          session.status = 'running';
+          session.updated_at = new Date().toISOString();
+          store.sessions[key] = session;
+          hasChanges = true;
+        }
+      } catch {
+        // File disappeared — mark as stopped
+        if (session.status === 'running') {
+          session.status = 'stopped';
+          session.updated_at = new Date().toISOString();
+          store.sessions[key] = session;
+          hasChanges = true;
+        }
+      }
+    } else if (session.status === 'running') {
+      // No transcript found — if session has been running for > 60s, mark stopped
+      const createdAt = new Date(session.created_at).getTime();
+      if (now - createdAt > 60_000) {
+        session.status = 'stopped';
+        session.updated_at = new Date().toISOString();
+        store.sessions[key] = session;
+        hasChanges = true;
+      }
+    }
+  }
+
+  if (hasChanges) {
     writeStore(store);
   }
 }

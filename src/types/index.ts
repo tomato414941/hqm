@@ -37,6 +37,7 @@ export interface Session {
   current_tool?: string;
   notification_type?: string;
   lastMessage?: string;
+  transcript_path?: string;
   team_name?: string;
   agent_name?: string;
 }

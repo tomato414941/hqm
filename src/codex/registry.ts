@@ -1,21 +1,12 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { logger } from '../utils/logger.js';
-import {
-  decodeCodexSessionId,
-  extractCodexSessionIdFromPath,
-  getCodexSessionsDir,
-} from './paths.js';
+import { getCodexSessionsDir } from './paths.js';
 
-interface RegistryEntry {
+interface TranscriptEntry {
   path: string;
-  mtimeMs: number;
+  createdAt: number;
 }
-
-const REGISTRY_TTL_MS = 30_000;
-
-let registry = new Map<string, RegistryEntry>();
-let lastRefresh = 0;
 
 function scanSessionsDir(dir: string, entries: string[]): void {
   const items = readdirSync(dir, { withFileTypes: true });
@@ -31,50 +22,77 @@ function scanSessionsDir(dir: string, entries: string[]): void {
   }
 }
 
-export function refreshCodexRegistry(): void {
+// Extract timestamp from Codex transcript filename
+// Format: rollout-YYYY-MM-DDTHH-MM-SS-{uuid}.jsonl
+const TIMESTAMP_REGEX = /rollout-(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})/;
+
+function extractTimestampFromFilename(filePath: string): number | undefined {
+  const name = basename(filePath);
+  const match = name.match(TIMESTAMP_REGEX);
+  if (!match) return undefined;
+  const [, year, month, day, hour, min, sec] = match;
+  const iso = `${year}-${month}-${day}T${hour}:${min}:${sec}Z`;
+  return new Date(iso).getTime();
+}
+
+export function scanCodexTranscripts(): TranscriptEntry[] {
   const sessionsDir = getCodexSessionsDir();
-  if (!existsSync(sessionsDir)) {
-    registry = new Map();
-    lastRefresh = Date.now();
-    return;
-  }
+  if (!existsSync(sessionsDir)) return [];
 
   const files: string[] = [];
   try {
     scanSessionsDir(sessionsDir, files);
   } catch (e) {
-    logger.warn('Codex registry scan failed', {
+    logger.warn('Codex transcript scan failed', {
       error: e instanceof Error ? e.message : 'unknown',
     });
-    registry = new Map();
-    lastRefresh = Date.now();
-    return;
+    return [];
   }
 
-  const nextRegistry = new Map<string, RegistryEntry>();
+  const entries: TranscriptEntry[] = [];
   for (const filePath of files) {
-    const sessionId = extractCodexSessionIdFromPath(filePath);
-    if (!sessionId) continue;
-    try {
-      const mtimeMs = statSync(filePath).mtimeMs;
-      const existing = nextRegistry.get(sessionId);
-      if (!existing || existing.mtimeMs < mtimeMs) {
-        nextRegistry.set(sessionId, { path: filePath, mtimeMs });
+    const ts = extractTimestampFromFilename(filePath);
+    if (ts) {
+      entries.push({ path: filePath, createdAt: ts });
+    } else {
+      // Fallback: use file birthtime
+      try {
+        const stat = statSync(filePath);
+        entries.push({ path: filePath, createdAt: stat.birthtimeMs });
+      } catch {
+        logger.warn('Failed to stat codex file', { path: filePath });
       }
-    } catch {
-      logger.warn('Failed to stat codex file', { path: filePath });
+    }
+  }
+  return entries;
+}
+
+const MATCH_TOLERANCE_MS = 10_000;
+
+export function resolveCodexTranscriptPath(session: {
+  transcript_path?: string;
+  created_at: string;
+}): string | undefined {
+  // 1. Cached path still valid
+  if (session.transcript_path && existsSync(session.transcript_path)) {
+    return session.transcript_path;
+  }
+
+  // 2. Scan and match by creation time proximity
+  const sessionCreatedAt = new Date(session.created_at).getTime();
+  if (Number.isNaN(sessionCreatedAt)) return undefined;
+
+  const transcripts = scanCodexTranscripts();
+  let bestMatch: TranscriptEntry | undefined;
+  let bestDelta = Number.POSITIVE_INFINITY;
+
+  for (const entry of transcripts) {
+    const delta = Math.abs(entry.createdAt - sessionCreatedAt);
+    if (delta <= MATCH_TOLERANCE_MS && delta < bestDelta) {
+      bestMatch = entry;
+      bestDelta = delta;
     }
   }
 
-  registry = nextRegistry;
-  lastRefresh = Date.now();
-  logger.debug('Codex registry refreshed', { size: registry.size });
-}
-
-export function getCodexTranscriptPath(sessionId: string): string | undefined {
-  const rawId = decodeCodexSessionId(sessionId);
-  if (Date.now() - lastRefresh > REGISTRY_TTL_MS) {
-    refreshCodexRegistry();
-  }
-  return registry.get(rawId)?.path;
+  return bestMatch?.path;
 }

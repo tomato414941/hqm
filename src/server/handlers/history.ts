@@ -28,7 +28,8 @@ export async function handleGetHistoryCommand(
     return;
   }
 
-  const transcriptPath = getTranscriptPath(sessionId, session.initial_cwd ?? session.cwd);
+  const transcriptPath =
+    session.transcript_path || getTranscriptPath(sessionId, session.initial_cwd ?? session.cwd);
   if (!transcriptPath) {
     ws.send(
       JSON.stringify({

@@ -31,6 +31,7 @@ import {
   getSessionFromStore,
   getSessionsFromStore,
   removeSessionFromStore,
+  updateCodexSessionStatuses,
   updateSessionInStore,
   updateSessionLastMessageInStore,
 } from './session-store.js';
@@ -113,6 +114,7 @@ export function getSessions(): Session[] {
 export async function cleanupStaleSessions(): Promise<void> {
   const store = readStore();
   await cleanupStaleSessionsInStore(store, writeStore);
+  updateCodexSessionStatuses(store, writeStore);
 }
 
 export function getSession(sessionId: string): Session | undefined {

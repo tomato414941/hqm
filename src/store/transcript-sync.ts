@@ -1,3 +1,4 @@
+import { resolveCodexTranscriptPath } from '../codex/registry.js';
 import type { Session, StoreData } from '../types/index.js';
 import { getLastAssistantMessage, getTranscriptPath } from '../utils/transcript.js';
 
@@ -11,10 +12,17 @@ export function syncTranscripts(sessions: Session[], store: StoreData): boolean 
   for (const session of sessions) {
     if (session.status === 'stopped') continue;
 
-    const transcriptPath = getTranscriptPath(
-      session.session_id,
-      session.initial_cwd ?? session.cwd
-    );
+    let transcriptPath: string | undefined;
+    if (session.agent === 'codex') {
+      transcriptPath = resolveCodexTranscriptPath(session);
+      if (transcriptPath && transcriptPath !== session.transcript_path) {
+        session.transcript_path = transcriptPath;
+        store.sessions[session.session_id] = session;
+        updated = true;
+      }
+    } else {
+      transcriptPath = getTranscriptPath(session.session_id, session.initial_cwd ?? session.cwd);
+    }
     if (!transcriptPath) continue;
 
     const message = getLastAssistantMessage(transcriptPath);
