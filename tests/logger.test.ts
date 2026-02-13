@@ -29,7 +29,13 @@ describe('logger', () => {
     renameSyncMock.mockReset();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    try {
+      const { _resetForTest } = await import('../src/utils/logger.js');
+      _resetForTest();
+    } catch {
+      // Ignore cleanup failures in tests that never loaded the module
+    }
     vi.resetModules();
   });
 
@@ -242,5 +248,28 @@ describe('logger', () => {
     const written = appendFileSyncMock.mock.calls[0][1] as string;
     const lines = written.trim().split('\n');
     expect(lines).toHaveLength(3);
+  });
+
+  it('does not register duplicate exit listeners when initLogger is called repeatedly', async () => {
+    const before = process.listenerCount('exit');
+    const { initLogger, _resetForTest } = await import('../src/utils/logger.js');
+
+    const afterImport = process.listenerCount('exit');
+    expect(afterImport).toBe(before + 1);
+
+    initLogger();
+    initLogger('debug');
+
+    expect(process.listenerCount('exit')).toBe(afterImport);
+    _resetForTest();
+  });
+
+  it('removes exit listener in _resetForTest', async () => {
+    const before = process.listenerCount('exit');
+    const { _resetForTest } = await import('../src/utils/logger.js');
+
+    expect(process.listenerCount('exit')).toBe(before + 1);
+    _resetForTest();
+    expect(process.listenerCount('exit')).toBe(before);
   });
 });

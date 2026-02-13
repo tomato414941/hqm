@@ -11,6 +11,7 @@ const RETRY_DELAY_MS = 50;
 export class WriteCache {
   private cachedStore: StoreData | null = null;
   private writeTimer: ReturnType<typeof setTimeout> | null = null;
+  private flushPromise: Promise<void> | null = null;
 
   constructor(
     private readonly storeDir: string,
@@ -62,31 +63,69 @@ export class WriteCache {
     return false;
   }
 
+  private scheduleFlushRetry(): void {
+    if (this.writeTimer || !this.cachedStore) {
+      return;
+    }
+    this.writeTimer = setTimeout(() => {
+      this.writeTimer = null;
+      void this.startFlush();
+    }, RETRY_DELAY_MS);
+  }
+
+  private startFlush(): Promise<void> {
+    if (!this.flushPromise) {
+      this.flushPromise = this.flushWriteAsync().finally(() => {
+        this.flushPromise = null;
+      });
+    }
+    return this.flushPromise;
+  }
+
   private async flushWriteAsync(): Promise<void> {
-    if (this.cachedStore) {
-      await this.attemptWriteAsync(this.cachedStore);
-      this.cachedStore = null;
-      this.writeTimer = null;
-    } else {
-      this.writeTimer = null;
+    while (this.cachedStore) {
+      const snapshot = this.cachedStore;
+      const writeSucceeded = await this.attemptWriteAsync(snapshot);
+
+      if (!writeSucceeded) {
+        this.scheduleFlushRetry();
+        return;
+      }
+
+      if (this.cachedStore === snapshot) {
+        this.cachedStore = null;
+      }
     }
   }
 
   scheduleWrite(data: StoreData): void {
     this.cachedStore = data;
 
+    if (this.flushPromise) {
+      return;
+    }
+
     if (this.writeTimer) {
       clearTimeout(this.writeTimer);
     }
     this.writeTimer = setTimeout(() => {
-      this.flushWriteAsync();
+      this.writeTimer = null;
+      void this.startFlush();
     }, WRITE_DEBOUNCE_MS);
   }
 
   async flushPendingWrites(): Promise<void> {
     if (this.writeTimer) {
       clearTimeout(this.writeTimer);
-      await this.flushWriteAsync();
+      this.writeTimer = null;
+    }
+
+    if (this.flushPromise) {
+      await this.flushPromise;
+    }
+
+    if (this.cachedStore) {
+      await this.startFlush();
     }
   }
 

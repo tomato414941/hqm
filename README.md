@@ -59,6 +59,15 @@ hqm serve
 
 Scan the QR code with your phone to access the web interface.
 
+#### Manual Verification (Markdown Fail-Safe)
+
+When validating the fallback path for missing `purify.min.js`, use this checklist:
+
+1. Temporarily rename `public/lib/purify.min.js` so it is not served.
+2. Start the web UI with `hqm serve` and open the session modal containing assistant markdown.
+3. Confirm markdown is rendered as escaped text (and line breaks only), not as executable HTML.
+4. Restore `public/lib/purify.min.js` after verification.
+
 ### Available Commands
 
 | Command | Description |

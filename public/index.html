@@ -1107,6 +1107,10 @@
       return div.innerHTML;
     }
 
+    function escapeHtmlWithLineBreaks(text) {
+      return escapeHtml(text).replace(/\n/g, '<br>');
+    }
+
     function isValidSessionId(id) {
       return /^[a-zA-Z0-9_-]+$/.test(id);
     }
@@ -1115,15 +1119,12 @@
       if (!markdownText) return '<span class="modal-message-empty">No messages yet</span>';
       if (typeof marked !== 'undefined') {
         marked.setOptions({ breaks: true, gfm: true });
-        const html = marked.parse(markdownText);
         if (typeof DOMPurify !== 'undefined') {
+          const html = marked.parse(markdownText);
           return DOMPurify.sanitize(html);
         }
-        return html;
       }
-      const container = document.createElement('div');
-      container.textContent = markdownText;
-      return container.innerHTML;
+      return escapeHtmlWithLineBreaks(markdownText);
     }
 
     function getSessionById(id) {

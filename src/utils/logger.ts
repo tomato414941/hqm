@@ -18,10 +18,20 @@ const MAX_GENERATIONS = 3;
 const FLUSH_INTERVAL_MS = 1000;
 const FLUSH_BUFFER_SIZE = 100;
 
+interface LoggerProcessState extends NodeJS.Process {
+  __hqmLoggerExitHandler?: () => void;
+}
+
+const processState = process as LoggerProcessState;
+
 let configuredLevel: LogLevel = 'info';
 let buffer: string[] = [];
 let flushTimer: ReturnType<typeof setInterval> | null = null;
 let dirEnsured = false;
+let exitHandlerRegistered = false;
+const exitHandler = (): void => {
+  flush();
+};
 
 function ensureLogDir(): void {
   if (dirEnsured) return;
@@ -140,7 +150,17 @@ export function initLogger(level?: LogLevel): void {
     configuredLevel = level;
   }
   startFlushTimer();
-  process.on('exit', flush);
+  if (!exitHandlerRegistered) {
+    const existingHandler = processState.__hqmLoggerExitHandler;
+    if (existingHandler && existingHandler !== exitHandler) {
+      process.off('exit', existingHandler);
+    }
+    if (existingHandler !== exitHandler) {
+      process.on('exit', exitHandler);
+    }
+    processState.__hqmLoggerExitHandler = exitHandler;
+    exitHandlerRegistered = true;
+  }
 }
 
 export const logger = {
@@ -168,6 +188,14 @@ export function _resetForTest(): void {
   dirEnsured = false;
   configuredLevel = 'info';
   stopFlushTimer();
+  if (exitHandlerRegistered) {
+    const existingHandler = processState.__hqmLoggerExitHandler;
+    if (existingHandler) {
+      process.off('exit', existingHandler);
+      processState.__hqmLoggerExitHandler = undefined;
+    }
+    exitHandlerRegistered = false;
+  }
 }
 
 export function _getBuffer(): string[] {

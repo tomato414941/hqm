@@ -21,8 +21,7 @@ export async function runWithAltScreen(renderFn: () => ReturnType<typeof render>
   } finally {
     logger.debug('runWithAltScreen: exiting alternate screen');
     process.stdout.write(EXIT_ALT_SCREEN);
-    logger.debug('runWithAltScreen: cleanup complete, calling process.exit(0)');
-    process.exit(0);
+    logger.debug('runWithAltScreen: cleanup complete');
   }
 }
 

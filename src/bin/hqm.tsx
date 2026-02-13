@@ -101,4 +101,7 @@ program.action(async () => {
   await defaultAction(options);
 });
 
-program.parseAsync().catch(console.error);
+program.parseAsync().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

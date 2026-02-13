@@ -191,4 +191,98 @@ describe('write-cache', () => {
       resetStoreCache();
     });
   });
+
+  describe('failure safety', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('keeps cachedStore after write failure', async () => {
+      vi.useFakeTimers();
+      const { WriteCache } = await import('../src/store/write-cache.js');
+      const cache = new WriteCache(TEST_STORE_DIR, TEST_STORE_FILE);
+      const data: StoreData = {
+        sessions: {},
+        updated_at: new Date().toISOString(),
+      };
+
+      const writeSpy = vi
+        .spyOn(
+          cache as unknown as {
+            attemptWriteAsync: (store: StoreData) => Promise<boolean>;
+          },
+          'attemptWriteAsync'
+        )
+        .mockResolvedValue(false);
+
+      cache.scheduleWrite(data);
+      await cache.flushPendingWrites();
+
+      expect(writeSpy).toHaveBeenCalledTimes(1);
+      expect(cache.getCachedStore()).toBe(data);
+      cache.resetStoreCache();
+    });
+
+    it('keeps latest data when new write arrives during a failed flush', async () => {
+      vi.useFakeTimers();
+      const { WriteCache } = await import('../src/store/write-cache.js');
+      const cache = new WriteCache(TEST_STORE_DIR, TEST_STORE_FILE);
+      const first: StoreData = {
+        sessions: { first: {} as StoreData['sessions'][string] },
+        updated_at: new Date().toISOString(),
+      };
+      const latest: StoreData = {
+        sessions: { latest: {} as StoreData['sessions'][string] },
+        updated_at: new Date().toISOString(),
+      };
+
+      let resolveAttempt: ((ok: boolean) => void) | undefined;
+      vi.spyOn(
+        cache as unknown as {
+          attemptWriteAsync: (store: StoreData) => Promise<boolean>;
+        },
+        'attemptWriteAsync'
+      ).mockImplementation(
+        () =>
+          new Promise<boolean>((resolve) => {
+            resolveAttempt = resolve;
+          })
+      );
+
+      cache.scheduleWrite(first);
+      const pendingFlush = cache.flushPendingWrites();
+
+      cache.scheduleWrite(latest);
+      resolveAttempt?.(false);
+      await pendingFlush;
+
+      expect(cache.getCachedStore()).toBe(latest);
+      cache.resetStoreCache();
+    });
+
+    it('flushPendingWrites flushes cached data even when no timer exists', async () => {
+      const { WriteCache } = await import('../src/store/write-cache.js');
+      const cache = new WriteCache(TEST_STORE_DIR, TEST_STORE_FILE);
+      const data: StoreData = {
+        sessions: {},
+        updated_at: new Date().toISOString(),
+      };
+
+      const writeSpy = vi
+        .spyOn(
+          cache as unknown as {
+            attemptWriteAsync: (store: StoreData) => Promise<boolean>;
+          },
+          'attemptWriteAsync'
+        )
+        .mockResolvedValue(true);
+
+      (cache as unknown as { cachedStore: StoreData | null }).cachedStore = data;
+
+      await cache.flushPendingWrites();
+
+      expect(writeSpy).toHaveBeenCalledTimes(1);
+      expect(cache.getCachedStore()).toBeNull();
+    });
+  });
 });
