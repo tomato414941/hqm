@@ -164,4 +164,102 @@ describe('codex-registry', () => {
       expect(result).toBe(closerPath);
     });
   });
+
+  describe('getCodexLastEntryType', () => {
+    it('should return "user" when last entry is event_msg with user_message', async () => {
+      const { getCodexLastEntryType } = await import('../src/codex/registry.js');
+      const sessionsDir = join(TEST_CODEX_HOME, 'sessions');
+      mkdirSync(sessionsDir, { recursive: true });
+
+      const filePath = join(sessionsDir, 'test-user.jsonl');
+      const lines = [
+        JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message', message: 'hi' } }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: { type: 'user_message', message: 'fix bug' },
+        }),
+      ];
+      writeFileSync(filePath, `${lines.join('\n')}\n`);
+
+      expect(getCodexLastEntryType(filePath)).toBe('user');
+    });
+
+    it('should return "agent" when last entry is event_msg with agent_message', async () => {
+      const { getCodexLastEntryType } = await import('../src/codex/registry.js');
+      const sessionsDir = join(TEST_CODEX_HOME, 'sessions');
+      mkdirSync(sessionsDir, { recursive: true });
+
+      const filePath = join(sessionsDir, 'test-agent.jsonl');
+      const lines = [
+        JSON.stringify({ type: 'event_msg', payload: { type: 'user_message', message: 'hi' } }),
+        JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message', message: 'done' } }),
+      ];
+      writeFileSync(filePath, `${lines.join('\n')}\n`);
+
+      expect(getCodexLastEntryType(filePath)).toBe('agent');
+    });
+
+    it('should return "agent" when last entry is response_item with assistant role', async () => {
+      const { getCodexLastEntryType } = await import('../src/codex/registry.js');
+      const sessionsDir = join(TEST_CODEX_HOME, 'sessions');
+      mkdirSync(sessionsDir, { recursive: true });
+
+      const filePath = join(sessionsDir, 'test-response.jsonl');
+      const lines = [
+        JSON.stringify({ type: 'event_msg', payload: { type: 'user_message', message: 'hi' } }),
+        JSON.stringify({
+          type: 'response_item',
+          payload: { type: 'message', role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
+        }),
+      ];
+      writeFileSync(filePath, `${lines.join('\n')}\n`);
+
+      expect(getCodexLastEntryType(filePath)).toBe('agent');
+    });
+
+    it('should return undefined for empty file', async () => {
+      const { getCodexLastEntryType } = await import('../src/codex/registry.js');
+      const sessionsDir = join(TEST_CODEX_HOME, 'sessions');
+      mkdirSync(sessionsDir, { recursive: true });
+
+      const filePath = join(sessionsDir, 'test-empty.jsonl');
+      writeFileSync(filePath, '');
+
+      expect(getCodexLastEntryType(filePath)).toBeUndefined();
+    });
+
+    it('should return undefined for invalid JSON lines', async () => {
+      const { getCodexLastEntryType } = await import('../src/codex/registry.js');
+      const sessionsDir = join(TEST_CODEX_HOME, 'sessions');
+      mkdirSync(sessionsDir, { recursive: true });
+
+      const filePath = join(sessionsDir, 'test-invalid.jsonl');
+      writeFileSync(filePath, 'not valid json\nalso not json\n');
+
+      expect(getCodexLastEntryType(filePath)).toBeUndefined();
+    });
+
+    it('should return undefined for non-existent file', async () => {
+      const { getCodexLastEntryType } = await import('../src/codex/registry.js');
+
+      expect(getCodexLastEntryType('/nonexistent/file.jsonl')).toBeUndefined();
+    });
+
+    it('should skip unrecognized entries and find the last meaningful one', async () => {
+      const { getCodexLastEntryType } = await import('../src/codex/registry.js');
+      const sessionsDir = join(TEST_CODEX_HOME, 'sessions');
+      mkdirSync(sessionsDir, { recursive: true });
+
+      const filePath = join(sessionsDir, 'test-skip.jsonl');
+      const lines = [
+        JSON.stringify({ type: 'event_msg', payload: { type: 'user_message', message: 'hi' } }),
+        JSON.stringify({ type: 'unknown_type', payload: {} }),
+        JSON.stringify({ type: 'event_msg', payload: { type: 'status_update' } }),
+      ];
+      writeFileSync(filePath, `${lines.join('\n')}\n`);
+
+      // Should skip the last two and find user_message
+      expect(getCodexLastEntryType(filePath)).toBe('user');
+    });
+  });
 });

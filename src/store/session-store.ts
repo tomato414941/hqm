@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { isCodexSessionId } from '../codex/paths.js';
-import { resolveCodexTranscriptPath } from '../codex/registry.js';
+import { getCodexLastEntryType, resolveCodexTranscriptPath } from '../codex/registry.js';
 import { CODEX_IDLE_THRESHOLD_MS } from '../constants.js';
 import type { HookEvent, Session, StoreData } from '../types/index.js';
 import { endPerf, startPerf } from '../utils/perf.js';
@@ -291,12 +291,12 @@ export function updateSessionLastMessageInStore(
 
 /**
  * Update Codex session statuses based on transcript file activity.
- * Codex doesn't send hooks, so we infer status from transcript mtime.
+ * Codex doesn't send hooks, so we infer status from transcript mtime
+ * combined with the last entry type (hybrid detection).
+ *
+ * @returns true if any session was updated
  */
-export function updateCodexSessionStatuses(
-  store: StoreData,
-  writeStore: (data: StoreData) => void
-): void {
+export function updateCodexSessionStatuses(store: StoreData): boolean {
   const now = Date.now();
   let hasChanges = false;
 
@@ -315,16 +315,25 @@ export function updateCodexSessionStatuses(
         const mtimeMs = statSync(transcriptPath).mtimeMs;
         const idle = now - mtimeMs > CODEX_IDLE_THRESHOLD_MS;
 
-        if (idle && session.status === 'running') {
-          session.status = 'stopped';
-          session.updated_at = new Date().toISOString();
-          store.sessions[key] = session;
-          hasChanges = true;
-        } else if (!idle && session.status === 'stopped') {
-          session.status = 'running';
-          session.updated_at = new Date().toISOString();
-          store.sessions[key] = session;
-          hasChanges = true;
+        if (!idle) {
+          // Recent activity — running
+          if (session.status !== 'running') {
+            session.status = 'running';
+            session.updated_at = new Date().toISOString();
+            store.sessions[key] = session;
+            hasChanges = true;
+          }
+        } else {
+          // mtime is stale — check last entry to disambiguate
+          const lastEntry = getCodexLastEntryType(transcriptPath);
+          const newStatus = lastEntry === 'user' ? 'running' : 'stopped';
+
+          if (session.status !== newStatus) {
+            session.status = newStatus;
+            session.updated_at = new Date().toISOString();
+            store.sessions[key] = session;
+            hasChanges = true;
+          }
         }
       } catch {
         // File disappeared — mark as stopped
@@ -347,7 +356,5 @@ export function updateCodexSessionStatuses(
     }
   }
 
-  if (hasChanges) {
-    writeStore(store);
-  }
+  return hasChanges;
 }

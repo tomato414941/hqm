@@ -105,7 +105,9 @@ export function updateSession(event: HookEvent): Session | undefined {
 export function getSessions(): Session[] {
   const store = readStore();
   const sessions = getSessionsFromStore(store);
-  if (syncTranscripts(sessions, store)) {
+  const codexUpdated = updateCodexSessionStatuses(store);
+  const transcriptsUpdated = syncTranscripts(sessions, store);
+  if (codexUpdated || transcriptsUpdated) {
     writeStore(store);
   }
   return sessions;
@@ -114,7 +116,9 @@ export function getSessions(): Session[] {
 export async function cleanupStaleSessions(): Promise<void> {
   const store = readStore();
   await cleanupStaleSessionsInStore(store, writeStore);
-  updateCodexSessionStatuses(store, writeStore);
+  if (updateCodexSessionStatuses(store)) {
+    writeStore(store);
+  }
 }
 
 export function getSession(sessionId: string): Session | undefined {

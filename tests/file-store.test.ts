@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -867,6 +867,136 @@ describe('file-store', () => {
         const afterProjects = getProjects();
         expect(afterProjects).toEqual(initialProjects);
       });
+    });
+  });
+
+  describe('Codex session status detection', () => {
+    it('should set running when transcript mtime is recent', async () => {
+      const { writeStore, getSessions, flushPendingWrites, resetStoreCache } = await import(
+        '../src/store/file-store.js'
+      );
+      const now = new Date();
+
+      // Create a transcript file with recent mtime
+      const transcriptDir = join(TEST_STORE_DIR, 'codex-transcripts');
+      mkdirSync(transcriptDir, { recursive: true });
+      const transcriptPath = join(transcriptDir, 'test.jsonl');
+      const agentEntry = JSON.stringify({
+        type: 'event_msg',
+        payload: { type: 'agent_message', message: 'done' },
+      });
+      writeFileSync(transcriptPath, `${agentEntry}\n`);
+
+      writeStore({
+        sessions: {
+          'codex-n-1': {
+            session_id: 'codex-n-1',
+            cwd: '/tmp',
+            agent: 'codex',
+            status: 'stopped',
+            transcript_path: transcriptPath,
+            created_at: now.toISOString(),
+            updated_at: now.toISOString(),
+          },
+        },
+        updated_at: now.toISOString(),
+      });
+      await flushPendingWrites();
+      resetStoreCache();
+
+      const sessions = getSessions();
+      const codexSession = sessions.find((s) => s.session_id === 'codex-n-1');
+      expect(codexSession?.status).toBe('running');
+    });
+
+    it('should set stopped when mtime is old and last entry is agent', async () => {
+      const { writeStore, getSessions, flushPendingWrites, resetStoreCache } = await import(
+        '../src/store/file-store.js'
+      );
+      const now = new Date();
+
+      // Create a transcript file
+      const transcriptDir = join(TEST_STORE_DIR, 'codex-transcripts');
+      mkdirSync(transcriptDir, { recursive: true });
+      const transcriptPath = join(transcriptDir, 'test-old.jsonl');
+      const agentEntry = JSON.stringify({
+        type: 'event_msg',
+        payload: { type: 'agent_message', message: 'done' },
+      });
+      writeFileSync(transcriptPath, `${agentEntry}\n`);
+
+      // Set mtime to 60 seconds ago
+      const oldTime = new Date(now.getTime() - 60_000);
+      utimesSync(transcriptPath, oldTime, oldTime);
+
+      writeStore({
+        sessions: {
+          'codex-n-2': {
+            session_id: 'codex-n-2',
+            cwd: '/tmp',
+            agent: 'codex',
+            status: 'running',
+            transcript_path: transcriptPath,
+            created_at: now.toISOString(),
+            updated_at: now.toISOString(),
+          },
+        },
+        updated_at: now.toISOString(),
+      });
+      await flushPendingWrites();
+      resetStoreCache();
+
+      const sessions = getSessions();
+      const codexSession = sessions.find((s) => s.session_id === 'codex-n-2');
+      expect(codexSession?.status).toBe('stopped');
+    });
+
+    it('should keep running when mtime is old but last entry is user', async () => {
+      const { writeStore, getSessions, flushPendingWrites, resetStoreCache } = await import(
+        '../src/store/file-store.js'
+      );
+      const now = new Date();
+
+      // Create a transcript file with user as last entry
+      const transcriptDir = join(TEST_STORE_DIR, 'codex-transcripts');
+      mkdirSync(transcriptDir, { recursive: true });
+      const transcriptPath = join(transcriptDir, 'test-user-last.jsonl');
+      const lines = [
+        JSON.stringify({
+          type: 'event_msg',
+          payload: { type: 'agent_message', message: 'hi' },
+        }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: { type: 'user_message', message: 'fix the bug' },
+        }),
+      ];
+      writeFileSync(transcriptPath, `${lines.join('\n')}\n`);
+
+      // Set mtime to 60 seconds ago
+      const oldTime = new Date(now.getTime() - 60_000);
+      utimesSync(transcriptPath, oldTime, oldTime);
+
+      writeStore({
+        sessions: {
+          'codex-n-3': {
+            session_id: 'codex-n-3',
+            cwd: '/tmp',
+            agent: 'codex',
+            status: 'running',
+            transcript_path: transcriptPath,
+            created_at: now.toISOString(),
+            updated_at: now.toISOString(),
+          },
+        },
+        updated_at: now.toISOString(),
+      });
+      await flushPendingWrites();
+      resetStoreCache();
+
+      const sessions = getSessions();
+      const codexSession = sessions.find((s) => s.session_id === 'codex-n-3');
+      expect(codexSession?.status).toBe('running');
     });
   });
 });
