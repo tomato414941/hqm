@@ -20,8 +20,8 @@ export const SESSION_UPDATE_DEBOUNCE_MS = 250;
 /** Debounce delay for JSON file writes in milliseconds */
 export const WRITE_DEBOUNCE_MS = 100;
 
-/** Periodic refresh interval for timeout detection in milliseconds (60 seconds) */
-export const SESSION_REFRESH_INTERVAL_MS = 60_000;
+/** Periodic refresh interval for timeout detection in milliseconds (15 seconds) */
+export const SESSION_REFRESH_INTERVAL_MS = 15_000;
 
 /** Hook event types supported by Claude Code */
 export const HOOK_EVENTS = [
