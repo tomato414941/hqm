@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import qrcode from 'qrcode-terminal';
 import { WebSocketServer } from 'ws';
+import { startCleanupLoop, stopCleanupLoop } from '../store/cleanup-loop.js';
 import { logger } from '../utils/logger.js';
 import { generateAuthToken } from './auth.js';
 import { startDaemonSocket, stopDaemonSocket } from './daemon-socket.js';
@@ -67,12 +68,14 @@ function createServerComponents(token: string): ServerComponents {
   const wss = new WebSocketServer({ server });
   setupWebSocketHandlers(wss, token);
   const watcher = createFileWatcher(wss);
+  startCleanupLoop();
 
   return { server, wss, watcher };
 }
 
 function stopServerComponents({ watcher, wss, server }: ServerComponents): void {
   void watcher.close();
+  stopCleanupLoop();
 
   for (const client of wss.clients) {
     client.terminate();

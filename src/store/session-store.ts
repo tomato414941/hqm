@@ -2,7 +2,11 @@ import { appendFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { isCodexSessionId } from '../codex/paths.js';
-import { getCodexLastEntryType, resolveCodexTranscriptPath } from '../codex/registry.js';
+import {
+  buildCodexTranscriptIndex,
+  getCodexLastEntryType,
+  resolveCodexTranscriptPath,
+} from '../codex/registry.js';
 import { CODEX_IDLE_THRESHOLD_MS } from '../constants.js';
 import type { HookEvent, Session, StoreData } from '../types/index.js';
 import { endPerf, startPerf } from '../utils/perf.js';
@@ -299,11 +303,13 @@ export function updateSessionLastMessageInStore(
 export function updateCodexSessionStatuses(store: StoreData): boolean {
   const now = Date.now();
   let hasChanges = false;
+  const transcriptIndex = buildCodexTranscriptIndex();
 
   for (const [key, session] of Object.entries(store.sessions)) {
     if (session.agent !== 'codex') continue;
 
-    const transcriptPath = session.transcript_path || resolveCodexTranscriptPath(session);
+    const transcriptPath =
+      session.transcript_path || resolveCodexTranscriptPath(session, transcriptIndex);
     if (transcriptPath && transcriptPath !== session.transcript_path) {
       session.transcript_path = transcriptPath;
       store.sessions[key] = session;

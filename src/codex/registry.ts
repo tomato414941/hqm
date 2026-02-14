@@ -3,10 +3,20 @@ import { basename, join } from 'node:path';
 import { logger } from '../utils/logger.js';
 import { getCodexSessionsDir } from './paths.js';
 
-interface TranscriptEntry {
+export interface TranscriptEntry {
   path: string;
   createdAt: number;
 }
+
+const TRANSCRIPT_INDEX_CACHE_TTL_MS = 5_000;
+
+let transcriptIndexCache:
+  | {
+      entries: TranscriptEntry[];
+      cachedAt: number;
+      signature: string;
+    }
+  | undefined;
 
 function scanSessionsDir(dir: string, entries: string[]): void {
   const items = readdirSync(dir, { withFileTypes: true });
@@ -67,12 +77,50 @@ export function scanCodexTranscripts(): TranscriptEntry[] {
   return entries;
 }
 
+function getSessionsDirSignature(sessionsDir: string): string {
+  if (!existsSync(sessionsDir)) {
+    return `${sessionsDir}:missing`;
+  }
+
+  try {
+    const stat = statSync(sessionsDir);
+    return `${sessionsDir}:${stat.mtimeMs}`;
+  } catch {
+    return `${sessionsDir}:error`;
+  }
+}
+
+export function buildCodexTranscriptIndex(): TranscriptEntry[] {
+  const sessionsDir = getCodexSessionsDir();
+  const signature = getSessionsDirSignature(sessionsDir);
+  const now = Date.now();
+
+  if (
+    transcriptIndexCache &&
+    transcriptIndexCache.signature === signature &&
+    now - transcriptIndexCache.cachedAt < TRANSCRIPT_INDEX_CACHE_TTL_MS
+  ) {
+    return transcriptIndexCache.entries;
+  }
+
+  const entries = scanCodexTranscripts();
+  transcriptIndexCache = { entries, cachedAt: now, signature };
+  return entries;
+}
+
+export function resetCodexTranscriptIndexCache(): void {
+  transcriptIndexCache = undefined;
+}
+
 const MATCH_TOLERANCE_MS = 10_000;
 
-export function resolveCodexTranscriptPath(session: {
-  transcript_path?: string;
-  created_at: string;
-}): string | undefined {
+export function resolveCodexTranscriptPath(
+  session: {
+    transcript_path?: string;
+    created_at: string;
+  },
+  transcriptIndex?: TranscriptEntry[]
+): string | undefined {
   // 1. Cached path still valid
   if (session.transcript_path && existsSync(session.transcript_path)) {
     return session.transcript_path;
@@ -82,7 +130,7 @@ export function resolveCodexTranscriptPath(session: {
   const sessionCreatedAt = new Date(session.created_at).getTime();
   if (Number.isNaN(sessionCreatedAt)) return undefined;
 
-  const transcripts = scanCodexTranscripts();
+  const transcripts = transcriptIndex ?? buildCodexTranscriptIndex();
   let bestMatch: TranscriptEntry | undefined;
   let bestDelta = Number.POSITIVE_INFINITY;
 

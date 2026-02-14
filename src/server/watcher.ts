@@ -2,13 +2,7 @@ import { basename, dirname } from 'node:path';
 import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import type { WebSocketServer } from 'ws';
-import { SESSION_REFRESH_INTERVAL_MS } from '../constants.js';
-import {
-  cleanupStaleSessions,
-  getProjects,
-  getSessions,
-  getStorePath,
-} from '../store/file-store.js';
+import { getProjects, getSessions, getStorePath } from '../store/file-store.js';
 import { broadcastToClients } from './websocket.js';
 
 export function createFileWatcher(wss: WebSocketServer): FSWatcher {
@@ -31,15 +25,5 @@ export function createFileWatcher(wss: WebSocketServer): FSWatcher {
   watcher.on('add', (filePath) => {
     if (basename(filePath) === storeBasename) handleChange();
   });
-
-  // Periodic cleanup for TTY close detection and timeout
-  const cleanupInterval = setInterval(cleanupStaleSessions, SESSION_REFRESH_INTERVAL_MS);
-
-  const originalClose = watcher.close.bind(watcher);
-  watcher.close = () => {
-    clearInterval(cleanupInterval);
-    return originalClose();
-  };
-
   return watcher;
 }

@@ -14,16 +14,20 @@ vi.mock('../src/codex/paths.js', async (importOriginal) => {
 });
 
 describe('codex-registry', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     if (existsSync(TEST_CODEX_HOME)) {
       rmSync(TEST_CODEX_HOME, { recursive: true, force: true });
     }
+    const { resetCodexTranscriptIndexCache } = await import('../src/codex/registry.js');
+    resetCodexTranscriptIndexCache();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (existsSync(TEST_CODEX_HOME)) {
       rmSync(TEST_CODEX_HOME, { recursive: true, force: true });
     }
+    const { resetCodexTranscriptIndexCache } = await import('../src/codex/registry.js');
+    resetCodexTranscriptIndexCache();
   });
 
   describe('scanCodexTranscripts', () => {
@@ -74,6 +78,21 @@ describe('codex-registry', () => {
 
       const result = scanCodexTranscripts();
       expect(result).toHaveLength(1);
+    });
+  });
+
+  describe('buildCodexTranscriptIndex', () => {
+    it('should build transcript index from sessions directory', async () => {
+      const { buildCodexTranscriptIndex } = await import('../src/codex/registry.js');
+      const sessionsDir = join(TEST_CODEX_HOME, 'sessions');
+      mkdirSync(sessionsDir, { recursive: true });
+
+      const filename = 'rollout-2025-01-15T10-30-45-abc12345-def6-7890-abcd-ef1234567890.jsonl';
+      writeFileSync(join(sessionsDir, filename), '{}\n');
+
+      const result = buildCodexTranscriptIndex();
+      expect(result).toHaveLength(1);
+      expect(result[0].path).toContain(filename);
     });
   });
 
@@ -162,6 +181,20 @@ describe('codex-registry', () => {
         created_at: sessionCreatedAt,
       });
       expect(result).toBe(closerPath);
+    });
+
+    it('should use provided transcript index when available', async () => {
+      const { resolveCodexTranscriptPath } = await import('../src/codex/registry.js');
+      const transcriptPath = '/tmp/codex-provided-index.jsonl';
+
+      const result = resolveCodexTranscriptPath(
+        {
+          created_at: '2025-01-15T10:30:45Z',
+        },
+        [{ path: transcriptPath, createdAt: new Date('2025-01-15T10:30:47Z').getTime() }]
+      );
+
+      expect(result).toBe(transcriptPath);
     });
   });
 

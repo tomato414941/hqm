@@ -1,13 +1,9 @@
 import { basename, dirname } from 'node:path';
 import chokidar from 'chokidar';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SESSION_REFRESH_INTERVAL_MS, SESSION_UPDATE_DEBOUNCE_MS } from '../constants.js';
-import {
-  cleanupStaleSessions,
-  getProjects,
-  getSessions,
-  getStorePath,
-} from '../store/file-store.js';
+import { SESSION_UPDATE_DEBOUNCE_MS } from '../constants.js';
+import { runCleanupOnce, startCleanupLoop, stopCleanupLoop } from '../store/cleanup-loop.js';
+import { getProjects, getSessions, getStorePath } from '../store/file-store.js';
 import type { Project, Session } from '../types/index.js';
 
 export function useSessions(): {
@@ -49,6 +45,8 @@ export function useSessions(): {
   useEffect(() => {
     // Initial load (immediate, no debounce)
     loadSessions();
+    void runCleanupOnce();
+    startCleanupLoop();
 
     // Watch file changes (debounced)
     const storePath = getStorePath();
@@ -67,13 +65,9 @@ export function useSessions(): {
       if (basename(filePath) === storeBasename) debouncedLoadSessions();
     });
 
-    // Periodic cleanup for TTY close detection and timeout
-    // cleanup → writeStore → chokidar detects change → debouncedLoadSessions fires
-    const cleanupInterval = setInterval(cleanupStaleSessions, SESSION_REFRESH_INTERVAL_MS);
-
     return () => {
       watcher.close();
-      clearInterval(cleanupInterval);
+      stopCleanupLoop();
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }

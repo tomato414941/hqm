@@ -1,4 +1,4 @@
-import { resolveCodexTranscriptPath } from '../codex/registry.js';
+import { buildCodexTranscriptIndex, resolveCodexTranscriptPath } from '../codex/registry.js';
 import type { Session, StoreData } from '../types/index.js';
 import { getLastAssistantMessage, getTranscriptPath } from '../utils/transcript.js';
 
@@ -8,13 +8,14 @@ import { getLastAssistantMessage, getTranscriptPath } from '../utils/transcript.
  */
 export function syncTranscripts(sessions: Session[], store: StoreData): boolean {
   let updated = false;
+  const transcriptIndex = buildCodexTranscriptIndex();
 
   for (const session of sessions) {
     if (session.status === 'stopped') continue;
 
     let transcriptPath: string | undefined;
     if (session.agent === 'codex') {
-      transcriptPath = resolveCodexTranscriptPath(session);
+      transcriptPath = resolveCodexTranscriptPath(session, transcriptIndex);
       if (transcriptPath && transcriptPath !== session.transcript_path) {
         session.transcript_path = transcriptPath;
         store.sessions[session.session_id] = session;
