@@ -1,6 +1,13 @@
+import { statSync } from 'node:fs';
 import { buildCodexTranscriptIndex, resolveCodexTranscriptPath } from '../codex/registry.js';
 import type { Session, StoreData } from '../types/index.js';
 import { getLastAssistantMessage, getTranscriptPath } from '../utils/transcript.js';
+
+const mtimeCache = new Map<string, { mtimeMs: number; lastMessage: string | undefined }>();
+
+export function clearTranscriptMtimeCache(): void {
+  mtimeCache.clear();
+}
 
 /**
  * Sync lastMessage from transcripts for active sessions
@@ -26,7 +33,20 @@ export function syncTranscripts(sessions: Session[], store: StoreData): boolean 
     }
     if (!transcriptPath) continue;
 
-    const message = getLastAssistantMessage(transcriptPath);
+    let message: string | undefined;
+    try {
+      const { mtimeMs } = statSync(transcriptPath);
+      const cached = mtimeCache.get(transcriptPath);
+      if (cached && cached.mtimeMs === mtimeMs) {
+        message = cached.lastMessage;
+      } else {
+        message = getLastAssistantMessage(transcriptPath);
+        mtimeCache.set(transcriptPath, { mtimeMs, lastMessage: message });
+      }
+    } catch {
+      // File may have been removed between path resolution and stat
+      message = getLastAssistantMessage(transcriptPath);
+    }
 
     if (message && message !== session.lastMessage) {
       session.lastMessage = message;

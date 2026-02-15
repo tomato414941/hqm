@@ -116,9 +116,6 @@ export function getSessions(): Session[] {
 export async function cleanupStaleSessions(): Promise<void> {
   const store = readStore();
   await cleanupStaleSessionsInStore(store, writeStore);
-  if (updateCodexSessionStatuses(store)) {
-    writeStore(store);
-  }
 }
 
 export function getSession(sessionId: string): Session | undefined {

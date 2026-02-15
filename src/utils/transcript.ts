@@ -1,4 +1,12 @@
-import { createReadStream, existsSync, readFileSync } from 'node:fs';
+import {
+  closeSync,
+  createReadStream,
+  existsSync,
+  fstatSync,
+  openSync,
+  readFileSync,
+  readSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -272,6 +280,40 @@ export function getAllMessages(
   }
 }
 
+const TAIL_READ_BYTES = 128 * 1024;
+
+/**
+ * Read the tail portion of a file without loading the entire file.
+ * Drops the first (potentially incomplete) line from the buffer.
+ */
+export function readTailContent(filePath: string, tailBytes: number = TAIL_READ_BYTES): string {
+  const fd = openSync(filePath, 'r');
+  try {
+    const { size } = fstatSync(fd);
+    if (size === 0) return '';
+
+    const readSize = Math.min(tailBytes, size);
+    const buffer = Buffer.alloc(readSize);
+    readSync(fd, buffer, 0, readSize, size - readSize);
+    let content = buffer.toString('utf-8');
+
+    // If we didn't read the whole file, drop the first (potentially incomplete) line
+    if (readSize < size) {
+      const firstNewline = content.indexOf('\n');
+      if (firstNewline !== -1) {
+        content = content.slice(firstNewline + 1);
+      } else {
+        // Entire buffer is one partial line — unusable
+        return '';
+      }
+    }
+
+    return content;
+  } finally {
+    closeSync(fd);
+  }
+}
+
 interface TranscriptMessage {
   type: 'user' | 'assistant' | 'result';
   message?: {
@@ -305,31 +347,40 @@ function extractCodexAssistantMessage(entry: CodexEntry): string | null {
   return null;
 }
 
+export function findLastAssistantInContent(content: string): string | undefined {
+  const lines = content.trim().split('\n').filter(Boolean);
+
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const entry = JSON.parse(lines[i]) as TranscriptMessage & CodexEntry;
+      const claudeText = extractClaudeAssistantMessage(entry);
+      if (claudeText) return claudeText;
+      const codexText = extractCodexAssistantMessage(entry);
+      if (codexText) return codexText;
+    } catch {
+      // Skip invalid JSON lines
+    }
+  }
+
+  return undefined;
+}
+
 export function getLastAssistantMessage(transcriptPath: string): string | undefined {
   if (!existsSync(transcriptPath)) {
     return undefined;
   }
 
   try {
-    const content = readFileSync(transcriptPath, 'utf-8');
-    const lines = content.trim().split('\n').filter(Boolean);
-
-    // Iterate from the end to find the last assistant message
-    for (let i = lines.length - 1; i >= 0; i--) {
-      try {
-        const entry = JSON.parse(lines[i]) as TranscriptMessage & CodexEntry;
-        const claudeText = extractClaudeAssistantMessage(entry);
-        if (claudeText) {
-          return claudeText;
-        }
-        const codexText = extractCodexAssistantMessage(entry);
-        if (codexText) {
-          return codexText;
-        }
-      } catch {
-        // Skip invalid JSON lines
-      }
+    // Try tail read first (efficient for large files)
+    const tailContent = readTailContent(transcriptPath);
+    if (tailContent) {
+      const result = findLastAssistantInContent(tailContent);
+      if (result) return result;
     }
+
+    // Fallback: read entire file (rare case where assistant message is far from end)
+    const fullContent = readFileSync(transcriptPath, 'utf-8');
+    return findLastAssistantInContent(fullContent);
   } catch (e) {
     logger.warn('Transcript read error', {
       path: transcriptPath,

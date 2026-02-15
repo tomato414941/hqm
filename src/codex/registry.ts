@@ -1,6 +1,7 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { logger } from '../utils/logger.js';
+import { readTailContent } from '../utils/transcript.js';
 import { getCodexSessionsDir } from './paths.js';
 
 export interface TranscriptEntry {
@@ -149,33 +150,42 @@ export function resolveCodexTranscriptPath(
  * Determine the type of the last meaningful entry in a Codex transcript.
  * Used to distinguish "user sent prompt, Codex thinking" from "Codex finished responding".
  */
+function findLastEntryTypeInContent(content: string): 'user' | 'agent' | undefined {
+  const lines = content.trim().split('\n').filter(Boolean);
+
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const entry = JSON.parse(lines[i]) as {
+        type?: string;
+        payload?: Record<string, unknown>;
+      };
+
+      if (entry.type === 'event_msg') {
+        const payloadType = entry.payload?.type;
+        if (payloadType === 'user_message') return 'user';
+        if (payloadType === 'agent_message') return 'agent';
+      }
+
+      if (entry.type === 'response_item') {
+        const payload = entry.payload || {};
+        if (payload.role === 'assistant') return 'agent';
+      }
+    } catch {
+      // Skip invalid JSON lines
+    }
+  }
+
+  return undefined;
+}
+
 export function getCodexLastEntryType(transcriptPath: string): 'user' | 'agent' | undefined {
   if (!existsSync(transcriptPath)) return undefined;
 
   try {
-    const content = readFileSync(transcriptPath, 'utf-8');
-    const lines = content.trim().split('\n').filter(Boolean);
-
-    for (let i = lines.length - 1; i >= 0; i--) {
-      try {
-        const entry = JSON.parse(lines[i]) as {
-          type?: string;
-          payload?: Record<string, unknown>;
-        };
-
-        if (entry.type === 'event_msg') {
-          const payloadType = entry.payload?.type;
-          if (payloadType === 'user_message') return 'user';
-          if (payloadType === 'agent_message') return 'agent';
-        }
-
-        if (entry.type === 'response_item') {
-          const payload = entry.payload || {};
-          if (payload.role === 'assistant') return 'agent';
-        }
-      } catch {
-        // Skip invalid JSON lines
-      }
+    const tailContent = readTailContent(transcriptPath);
+    if (tailContent) {
+      const result = findLastEntryTypeInContent(tailContent);
+      if (result) return result;
     }
   } catch (e) {
     logger.warn('Codex transcript read error', {

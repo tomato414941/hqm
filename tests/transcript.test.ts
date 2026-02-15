@@ -5,6 +5,10 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
   createReadStream: vi.fn(),
+  openSync: vi.fn(),
+  fstatSync: vi.fn(),
+  readSync: vi.fn(),
+  closeSync: vi.fn(),
 }));
 
 function createMockReadStream(content: string): Readable {
@@ -15,6 +19,10 @@ describe('transcript', () => {
   let existsSyncMock: ReturnType<typeof vi.fn>;
   let readFileSyncMock: ReturnType<typeof vi.fn>;
   let createReadStreamMock: ReturnType<typeof vi.fn>;
+  let openSyncMock: ReturnType<typeof vi.fn>;
+  let fstatSyncMock: ReturnType<typeof vi.fn>;
+  let readSyncMock: ReturnType<typeof vi.fn>;
+  let closeSyncMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -22,14 +30,40 @@ describe('transcript', () => {
     existsSyncMock = fs.existsSync as ReturnType<typeof vi.fn>;
     readFileSyncMock = fs.readFileSync as ReturnType<typeof vi.fn>;
     createReadStreamMock = fs.createReadStream as ReturnType<typeof vi.fn>;
+    openSyncMock = fs.openSync as ReturnType<typeof vi.fn>;
+    fstatSyncMock = fs.fstatSync as ReturnType<typeof vi.fn>;
+    readSyncMock = fs.readSync as ReturnType<typeof vi.fn>;
+    closeSyncMock = fs.closeSync as ReturnType<typeof vi.fn>;
     existsSyncMock.mockReset();
     readFileSyncMock.mockReset();
     createReadStreamMock.mockReset();
+    openSyncMock.mockReset();
+    fstatSyncMock.mockReset();
+    readSyncMock.mockReset();
+    closeSyncMock.mockReset();
   });
 
   afterEach(() => {
     vi.resetModules();
   });
+
+  /**
+   * Set up mocks for both readFileSync and the low-level fd-based reads
+   * used by readTailContent.
+   */
+  function setupFileContent(content: string): void {
+    const buf = Buffer.from(content, 'utf-8');
+    readFileSyncMock.mockReturnValue(content);
+    openSyncMock.mockReturnValue(42);
+    fstatSyncMock.mockReturnValue({ size: buf.length });
+    readSyncMock.mockImplementation(
+      (_fd: number, target: Buffer, offset: number, length: number, position: number) => {
+        buf.copy(target, offset, position, position + length);
+        return length;
+      }
+    );
+    closeSyncMock.mockImplementation(() => {});
+  }
 
   describe('buildTranscriptPath', () => {
     it('builds correct path from cwd and sessionId', async () => {
@@ -66,19 +100,18 @@ describe('transcript', () => {
 
     it('returns last assistant message from valid JSONL', async () => {
       existsSyncMock.mockReturnValue(true);
-      readFileSyncMock.mockReturnValue(
-        [
-          JSON.stringify({ type: 'user', message: { content: [{ type: 'text', text: 'Hello' }] } }),
-          JSON.stringify({
-            type: 'assistant',
-            message: { content: [{ type: 'text', text: 'First response' }] },
-          }),
-          JSON.stringify({
-            type: 'assistant',
-            message: { content: [{ type: 'text', text: 'Second response' }] },
-          }),
-        ].join('\n')
-      );
+      const content = [
+        JSON.stringify({ type: 'user', message: { content: [{ type: 'text', text: 'Hello' }] } }),
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'First response' }] },
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Second response' }] },
+        }),
+      ].join('\n');
+      setupFileContent(content);
 
       const { getLastAssistantMessage } = await import('../src/utils/transcript.js');
 
@@ -89,12 +122,11 @@ describe('transcript', () => {
 
     it('returns undefined when no assistant messages exist', async () => {
       existsSyncMock.mockReturnValue(true);
-      readFileSyncMock.mockReturnValue(
-        [
-          JSON.stringify({ type: 'user', message: { content: [{ type: 'text', text: 'Hello' }] } }),
-          JSON.stringify({ type: 'result', message: {} }),
-        ].join('\n')
-      );
+      const content = [
+        JSON.stringify({ type: 'user', message: { content: [{ type: 'text', text: 'Hello' }] } }),
+        JSON.stringify({ type: 'result', message: {} }),
+      ].join('\n');
+      setupFileContent(content);
 
       const { getLastAssistantMessage } = await import('../src/utils/transcript.js');
 
@@ -105,19 +137,18 @@ describe('transcript', () => {
 
     it('skips invalid JSON lines and continues processing', async () => {
       existsSyncMock.mockReturnValue(true);
-      readFileSyncMock.mockReturnValue(
-        [
-          JSON.stringify({
-            type: 'assistant',
-            message: { content: [{ type: 'text', text: 'Valid message' }] },
-          }),
-          'invalid json {{{',
-          JSON.stringify({
-            type: 'assistant',
-            message: { content: [{ type: 'text', text: 'Last valid' }] },
-          }),
-        ].join('\n')
-      );
+      const content = [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Valid message' }] },
+        }),
+        'invalid json {{{',
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Last valid' }] },
+        }),
+      ].join('\n');
+      setupFileContent(content);
 
       const { getLastAssistantMessage } = await import('../src/utils/transcript.js');
 
@@ -128,6 +159,9 @@ describe('transcript', () => {
 
     it('returns undefined on file read error', async () => {
       existsSyncMock.mockReturnValue(true);
+      openSyncMock.mockImplementation(() => {
+        throw new Error('Permission denied');
+      });
       readFileSyncMock.mockImplementation(() => {
         throw new Error('Permission denied');
       });
@@ -141,18 +175,17 @@ describe('transcript', () => {
 
     it('concatenates multiple text parts in content array', async () => {
       existsSyncMock.mockReturnValue(true);
-      readFileSyncMock.mockReturnValue(
-        JSON.stringify({
-          type: 'assistant',
-          message: {
-            content: [
-              { type: 'text', text: 'Part one' },
-              { type: 'tool_use', name: 'some_tool' },
-              { type: 'text', text: 'Part two' },
-            ],
-          },
-        })
-      );
+      const content = JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [
+            { type: 'text', text: 'Part one' },
+            { type: 'tool_use', name: 'some_tool' },
+            { type: 'text', text: 'Part two' },
+          ],
+        },
+      });
+      setupFileContent(content);
 
       const { getLastAssistantMessage } = await import('../src/utils/transcript.js');
 
@@ -163,12 +196,11 @@ describe('transcript', () => {
 
     it('handles empty content array', async () => {
       existsSyncMock.mockReturnValue(true);
-      readFileSyncMock.mockReturnValue(
-        JSON.stringify({
-          type: 'assistant',
-          message: { content: [] },
-        })
-      );
+      const content = JSON.stringify({
+        type: 'assistant',
+        message: { content: [] },
+      });
+      setupFileContent(content);
 
       const { getLastAssistantMessage } = await import('../src/utils/transcript.js');
 
@@ -179,7 +211,7 @@ describe('transcript', () => {
 
     it('handles empty file', async () => {
       existsSyncMock.mockReturnValue(true);
-      readFileSyncMock.mockReturnValue('');
+      setupFileContent('');
 
       const { getLastAssistantMessage } = await import('../src/utils/transcript.js');
 
@@ -188,23 +220,19 @@ describe('transcript', () => {
       expect(result).toBeUndefined();
     });
 
-    // Tests for multi-line assistant messages where text is in a separate entry
-    // The implementation correctly skips entries without text and finds the previous text
-
     it('finds previous text when last assistant has only tool_use', async () => {
       existsSyncMock.mockReturnValue(true);
-      readFileSyncMock.mockReturnValue(
-        [
-          JSON.stringify({
-            type: 'assistant',
-            message: { content: [{ type: 'text', text: 'This is the actual response' }] },
-          }),
-          JSON.stringify({
-            type: 'assistant',
-            message: { content: [{ type: 'tool_use', id: 'toolu_123', name: 'Bash', input: {} }] },
-          }),
-        ].join('\n')
-      );
+      const content = [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'This is the actual response' }] },
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'tool_use', id: 'toolu_123', name: 'Bash', input: {} }] },
+        }),
+      ].join('\n');
+      setupFileContent(content);
 
       const { getLastAssistantMessage } = await import('../src/utils/transcript.js');
       const result = getLastAssistantMessage('/path/to/transcript.jsonl');
@@ -214,18 +242,17 @@ describe('transcript', () => {
 
     it('finds previous text when last assistant has only thinking', async () => {
       existsSyncMock.mockReturnValue(true);
-      readFileSyncMock.mockReturnValue(
-        [
-          JSON.stringify({
-            type: 'assistant',
-            message: { content: [{ type: 'text', text: 'User visible message' }] },
-          }),
-          JSON.stringify({
-            type: 'assistant',
-            message: { content: [{ type: 'thinking', thinking: 'Internal thought process' }] },
-          }),
-        ].join('\n')
-      );
+      const content = [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'User visible message' }] },
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'thinking', thinking: 'Internal thought process' }] },
+        }),
+      ].join('\n');
+      setupFileContent(content);
 
       const { getLastAssistantMessage } = await import('../src/utils/transcript.js');
       const result = getLastAssistantMessage('/path/to/transcript.jsonl');
@@ -235,34 +262,124 @@ describe('transcript', () => {
 
     it('finds text in real Claude Code transcript format with multiple assistant entries', async () => {
       existsSyncMock.mockReturnValue(true);
-      // Simulating actual Claude Code transcript structure
-      readFileSyncMock.mockReturnValue(
-        [
-          JSON.stringify({ type: 'summary', summary: 'Session summary' }),
-          JSON.stringify({ type: 'user', message: { content: [{ type: 'text', text: 'Hello' }] } }),
-          JSON.stringify({
-            type: 'assistant',
-            message: { content: [{ type: 'thinking', thinking: 'Let me help...' }] },
-          }),
-          JSON.stringify({
-            type: 'assistant',
-            message: { content: [{ type: 'text', text: 'Here is my response to help you.' }] },
-          }),
-          JSON.stringify({
-            type: 'assistant',
-            message: {
-              content: [
-                { type: 'tool_use', id: 'toolu_abc', name: 'Read', input: { file_path: '/test' } },
-              ],
-            },
-          }),
-        ].join('\n')
-      );
+      const content = [
+        JSON.stringify({ type: 'summary', summary: 'Session summary' }),
+        JSON.stringify({ type: 'user', message: { content: [{ type: 'text', text: 'Hello' }] } }),
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'thinking', thinking: 'Let me help...' }] },
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Here is my response to help you.' }] },
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          message: {
+            content: [
+              { type: 'tool_use', id: 'toolu_abc', name: 'Read', input: { file_path: '/test' } },
+            ],
+          },
+        }),
+      ].join('\n');
+      setupFileContent(content);
 
       const { getLastAssistantMessage } = await import('../src/utils/transcript.js');
       const result = getLastAssistantMessage('/path/to/transcript.jsonl');
 
       expect(result).toBe('Here is my response to help you.');
+    });
+  });
+
+  describe('readTailContent', () => {
+    it('reads entire file when smaller than tailBytes', async () => {
+      existsSyncMock.mockReturnValue(true);
+      const content = 'line1\nline2\nline3';
+      setupFileContent(content);
+
+      const { readTailContent } = await import('../src/utils/transcript.js');
+      const result = readTailContent('/path/to/file.jsonl');
+
+      expect(result).toBe(content);
+      expect(closeSyncMock).toHaveBeenCalled();
+    });
+
+    it('returns empty string for empty file', async () => {
+      openSyncMock.mockReturnValue(42);
+      fstatSyncMock.mockReturnValue({ size: 0 });
+      closeSyncMock.mockImplementation(() => {});
+
+      const { readTailContent } = await import('../src/utils/transcript.js');
+      const result = readTailContent('/path/to/file.jsonl');
+
+      expect(result).toBe('');
+    });
+
+    it('drops first partial line when reading tail of large file', async () => {
+      const fullContent = 'first-complete-line\nsecond-line\nthird-line';
+      const buf = Buffer.from(fullContent, 'utf-8');
+      // Simulate reading only last 25 bytes (partial first line + rest)
+      const tailBytes = 25;
+      const tailPortion = buf.subarray(buf.length - tailBytes);
+
+      openSyncMock.mockReturnValue(42);
+      fstatSyncMock.mockReturnValue({ size: buf.length });
+      readSyncMock.mockImplementation(
+        (_fd: number, target: Buffer, offset: number, length: number, position: number) => {
+          buf.copy(target, offset, position, position + length);
+          return length;
+        }
+      );
+      closeSyncMock.mockImplementation(() => {});
+
+      const { readTailContent } = await import('../src/utils/transcript.js');
+      const result = readTailContent('/path/to/file.jsonl', tailBytes);
+
+      // Should drop the first partial line
+      const tailStr = tailPortion.toString('utf-8');
+      const firstNewline = tailStr.indexOf('\n');
+      const expected = tailStr.slice(firstNewline + 1);
+      expect(result).toBe(expected);
+    });
+
+    it('closes fd even on read error', async () => {
+      openSyncMock.mockReturnValue(42);
+      fstatSyncMock.mockImplementation(() => {
+        throw new Error('stat error');
+      });
+      closeSyncMock.mockImplementation(() => {});
+
+      const { readTailContent } = await import('../src/utils/transcript.js');
+      expect(() => readTailContent('/path/to/file.jsonl')).toThrow('stat error');
+      expect(closeSyncMock).toHaveBeenCalledWith(42);
+    });
+  });
+
+  describe('findLastAssistantInContent', () => {
+    it('finds last assistant message in content string', async () => {
+      const { findLastAssistantInContent } = await import('../src/utils/transcript.js');
+      const content = [
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'First' }] },
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Second' }] },
+        }),
+      ].join('\n');
+
+      expect(findLastAssistantInContent(content)).toBe('Second');
+    });
+
+    it('returns undefined for content with no assistant messages', async () => {
+      const { findLastAssistantInContent } = await import('../src/utils/transcript.js');
+      const content = JSON.stringify({
+        type: 'user',
+        message: { content: [{ type: 'text', text: 'Hello' }] },
+      });
+
+      expect(findLastAssistantInContent(content)).toBeUndefined();
     });
   });
 

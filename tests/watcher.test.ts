@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '../src/types/index.js';
 
 // Mock chokidar
@@ -35,9 +35,14 @@ vi.mock('../src/server/websocket.js', () => ({
 
 describe('watcher', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     mockWatcher.on.mockClear();
     mockWatcher.on.mockReturnThis();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('createFileWatcher', () => {
@@ -51,7 +56,7 @@ describe('watcher', () => {
       expect(mockWatcher.on).toHaveBeenCalledWith('change', expect.any(Function));
     });
 
-    it('should broadcast sessions on file change', async () => {
+    it('should broadcast sessions on file change after debounce', async () => {
       const { createFileWatcher } = await import('../src/server/watcher.js');
       const mockWss = { clients: new Set() };
 
@@ -74,16 +79,46 @@ describe('watcher', () => {
       expect(changeHandler).toBeDefined();
 
       // Trigger change with matching filename
-      await changeHandler('/tmp/sessions.json');
+      changeHandler('/tmp/sessions.json');
 
-      // Wait for async operations
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Should not broadcast immediately
+      expect(mockBroadcast).not.toHaveBeenCalled();
+
+      // Advance past debounce delay
+      vi.advanceTimersByTime(250);
 
       expect(mockBroadcast).toHaveBeenCalledWith(mockWss, {
         type: 'sessions',
         data: sessions,
         projects: [],
       });
+    });
+
+    it('should debounce rapid changes', async () => {
+      const { createFileWatcher } = await import('../src/server/watcher.js');
+      const mockWss = { clients: new Set() };
+
+      mockGetSessions.mockReturnValue([]);
+
+      createFileWatcher(mockWss as never);
+
+      const changeHandler = mockWatcher.on.mock.calls.find((call) => call[0] === 'change')?.[1];
+
+      // Trigger multiple rapid changes
+      changeHandler('/tmp/sessions.json');
+      vi.advanceTimersByTime(100);
+      changeHandler('/tmp/sessions.json');
+      vi.advanceTimersByTime(100);
+      changeHandler('/tmp/sessions.json');
+
+      // Should not have broadcast yet
+      expect(mockBroadcast).not.toHaveBeenCalled();
+
+      // Advance past debounce from last change
+      vi.advanceTimersByTime(250);
+
+      // Should only broadcast once
+      expect(mockBroadcast).toHaveBeenCalledTimes(1);
     });
   });
 });
