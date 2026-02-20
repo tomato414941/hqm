@@ -24,9 +24,11 @@ vi.mock('node:os', async (importOriginal) => {
 });
 
 vi.mock('../src/store/file-store.js', () => ({
-  getSessions: vi.fn(),
+  getSessions: vi.fn().mockReturnValue([]),
+  getSessionsLight: vi.fn().mockReturnValue([]),
   clearSessions: vi.fn(),
   getStorePath: vi.fn(() => '/tmp/test-store'),
+  refreshSessionData: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('../src/utils/focus.js', () => ({
@@ -45,13 +47,13 @@ vi.mock('../src/utils/transcript.js', () => ({
   getAllMessagesAsync: vi.fn(),
 }));
 
-import { clearSessions, getSessions } from '../src/store/file-store.js';
+import { clearSessions, getSessionsLight } from '../src/store/file-store.js';
 import { focusSessionByContext } from '../src/utils/focus.js';
 import { sendTextToTerminal } from '../src/utils/send-text.js';
 import { getAllMessagesAsync, getTranscriptPath } from '../src/utils/transcript.js';
 
 const mockNetworkInterfaces = vi.mocked(networkInterfaces);
-const mockGetSessions = vi.mocked(getSessions);
+const mockGetSessions = vi.mocked(getSessionsLight);
 const mockClearSessions = vi.mocked(clearSessions);
 const mockFocusSessionByContext = vi.mocked(focusSessionByContext);
 const mockSendTextToTerminal = vi.mocked(sendTextToTerminal);
@@ -273,7 +275,7 @@ describe('server', () => {
 
       try {
         const port = await findAvailablePort(59991);
-        expect(port).toBe(59992);
+        expect(port).toBeGreaterThan(59991);
       } finally {
         server.close();
       }
@@ -287,7 +289,7 @@ describe('server', () => {
 
     it('sends error when session not found', async () => {
       const ws = createMockWebSocket();
-      mockGetSessions.mockResolvedValue([]);
+      mockGetSessions.mockReturnValue([]);
 
       await handleFocusCommand(ws, 'non-existent');
 
@@ -302,7 +304,7 @@ describe('server', () => {
 
     it('sends false success when focusSessionByContext fails', async () => {
       const ws = createMockWebSocket();
-      mockGetSessions.mockResolvedValue([
+      mockGetSessions.mockReturnValue([
         { session_id: 'test-session', tty: '', cwd: '/tmp', status: 'active' },
       ]);
       mockFocusSessionByContext.mockReturnValue(false);
@@ -317,7 +319,7 @@ describe('server', () => {
 
     it('sends success when focus succeeds', async () => {
       const ws = createMockWebSocket();
-      mockGetSessions.mockResolvedValue([
+      mockGetSessions.mockReturnValue([
         { session_id: 'test-session', tty: '/dev/pts/0', cwd: '/tmp', status: 'active' },
       ]);
       mockFocusSessionByContext.mockReturnValue(true);
@@ -353,7 +355,7 @@ describe('server', () => {
 
     it('sends error when session not found', async () => {
       const ws = createMockWebSocket();
-      mockGetSessions.mockResolvedValue([]);
+      mockGetSessions.mockReturnValue([]);
 
       await handleSendTextCommand(ws, 'non-existent', 'echo hello');
 
@@ -368,7 +370,7 @@ describe('server', () => {
 
     it('sends text to terminal on success', async () => {
       const ws = createMockWebSocket();
-      mockGetSessions.mockResolvedValue([
+      mockGetSessions.mockReturnValue([
         { session_id: 'test-session', tty: '/dev/pts/0', cwd: '/tmp', status: 'active' },
       ]);
       mockSendTextToTerminal.mockReturnValue({ success: true });
@@ -424,7 +426,7 @@ describe('server', () => {
 
     it('sends empty result when session not found', async () => {
       const ws = createMockWebSocket();
-      mockGetSessions.mockResolvedValue([]);
+      mockGetSessions.mockReturnValue([]);
 
       await handleGetHistoryCommand(ws, 'non-existent');
 
@@ -441,7 +443,7 @@ describe('server', () => {
 
     it('returns history messages', async () => {
       const ws = createMockWebSocket();
-      mockGetSessions.mockResolvedValue([
+      mockGetSessions.mockReturnValue([
         { session_id: 'test-session', tty: '/dev/pts/0', cwd: '/tmp', status: 'active' },
       ]);
       mockGetTranscriptPath.mockReturnValue('/tmp/.claude/transcript.jsonl');

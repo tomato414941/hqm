@@ -13,13 +13,20 @@ vi.mock('chokidar', () => ({
 }));
 
 // Mock file-store
-const mockGetSessions = vi.fn();
+const mockGetSessionsLight = vi.fn();
 const mockGetProjects = vi.fn().mockReturnValue([]);
 vi.mock('../src/store/file-store.js', () => ({
-  getSessions: () => mockGetSessions(),
+  getSessions: () => mockGetSessionsLight(),
+  getSessionsLight: () => mockGetSessionsLight(),
   getProjects: () => mockGetProjects(),
   getStorePath: () => '/tmp/sessions.json',
   cleanupStaleSessions: vi.fn().mockResolvedValue(undefined),
+  refreshSessionData: () => mockGetSessionsLight(),
+}));
+
+// Mock write-cache
+vi.mock('../src/store/write-cache.js', () => ({
+  getLastWriteTimestampMs: () => 0,
 }));
 
 // Mock config
@@ -70,7 +77,7 @@ describe('watcher', () => {
           updated_at: new Date().toISOString(),
         },
       ];
-      mockGetSessions.mockReturnValue(sessions);
+      mockGetSessionsLight.mockReturnValue(sessions);
 
       createFileWatcher(mockWss as never);
 
@@ -98,7 +105,7 @@ describe('watcher', () => {
       const { createFileWatcher } = await import('../src/server/watcher.js');
       const mockWss = { clients: new Set() };
 
-      mockGetSessions.mockReturnValue([]);
+      mockGetSessionsLight.mockReturnValue([]);
 
       createFileWatcher(mockWss as never);
 

@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
 vi.mock('../src/store/file-store.js', () => ({
-  getSessions: vi.fn().mockResolvedValue([]),
+  getSessions: vi.fn().mockReturnValue([]),
+  getSessionsLight: vi.fn().mockReturnValue([]),
   getProjects: vi.fn().mockReturnValue([]),
+  refreshSessionData: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('../src/utils/logger.js', () => ({

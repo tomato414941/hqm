@@ -3,6 +3,8 @@ import { networkInterfaces } from 'node:os';
 import qrcode from 'qrcode-terminal';
 import { WebSocketServer } from 'ws';
 import { startCleanupLoop, stopCleanupLoop } from '../store/cleanup-loop.js';
+import { getProjects, getSessionsLight } from '../store/file-store.js';
+import { onRefresh, startRefreshLoop, stopRefreshLoop } from '../store/refresh-loop.js';
 import { logger } from '../utils/logger.js';
 import { generateAuthToken } from './auth.js';
 import { startDaemonSocket, stopDaemonSocket } from './daemon-socket.js';
@@ -69,6 +71,14 @@ function createServerComponents(token: string): ServerComponents {
   setupWebSocketHandlers(wss, token);
   const watcher = createFileWatcher(wss);
   startCleanupLoop();
+  startRefreshLoop();
+
+  // Broadcast light session data when refresh loop completes
+  onRefresh(() => {
+    const sessions = getSessionsLight();
+    const projects = getProjects();
+    broadcastToClients(wss, { type: 'sessions', data: sessions, projects });
+  });
 
   return { server, wss, watcher };
 }
@@ -76,6 +86,7 @@ function createServerComponents(token: string): ServerComponents {
 function stopServerComponents({ watcher, wss, server }: ServerComponents): void {
   void watcher.close();
   stopCleanupLoop();
+  stopRefreshLoop();
 
   for (const client of wss.clients) {
     client.terminate();

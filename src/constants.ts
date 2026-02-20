@@ -76,3 +76,18 @@ export const CODEX_IDLE_THRESHOLD_MS = 30_000;
 
 /** Unix domain socket filename for daemon IPC */
 export const DAEMON_SOCKET_FILENAME = 'hqm.sock';
+
+/** Bytes to read from file tail for transcript parsing */
+export const TAIL_READ_BYTES = 128 * 1024;
+
+/** Tolerance window for matching Codex sessions by creation time (ms) */
+export const CODEX_MATCH_TOLERANCE_MS = 10_000;
+
+/** Periodic interval for heavy session data refresh (Codex status + transcript sync) */
+export const SESSION_DATA_REFRESH_INTERVAL_MS = 5_000;
+
+/** Time window to suppress chokidar re-fire after our own write */
+export const SELF_WRITE_SUPPRESSION_MS = 500;
+
+/** Maximum entries in transcript mtime cache (FIFO eviction) */
+export const MAX_MTIME_CACHE_SIZE = 200;

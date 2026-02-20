@@ -102,7 +102,20 @@ export function updateSession(event: HookEvent): Session | undefined {
   return updateSessionInStore(store, event, writeStore);
 }
 
-export function getSessions(): Session[] {
+/**
+ * Light path: readStore + sort only. No I/O (Codex scan / transcript stat).
+ * Used by chokidar handlers and UI rendering for fast response.
+ */
+export function getSessionsLight(): Session[] {
+  const store = readStore();
+  return getSessionsFromStore(store);
+}
+
+/**
+ * Heavy path: Codex status update + transcript sync.
+ * Called by the periodic refresh loop (every 5s) and one-shot CLI commands.
+ */
+export function refreshSessionData(): Session[] {
   const store = readStore();
   const sessions = getSessionsFromStore(store);
   const codexUpdated = updateCodexSessionStatuses(store);
@@ -111,6 +124,14 @@ export function getSessions(): Session[] {
     writeStore(store);
   }
   return sessions;
+}
+
+/**
+ * @deprecated Use getSessionsLight() for UI reads or refreshSessionData() for full sync.
+ * Kept as alias of getSessionsLight for backward compatibility.
+ */
+export function getSessions(): Session[] {
+  return getSessionsLight();
 }
 
 export async function cleanupStaleSessions(): Promise<void> {

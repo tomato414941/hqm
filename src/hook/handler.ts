@@ -4,10 +4,7 @@ import type { HookEvent } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { endPerf, startPerf } from '../utils/perf.js';
 import { getTeamContext } from '../utils/team.js';
-import { isNonEmptyString, isValidHookEventName, VALID_HOOK_EVENTS } from '../utils/type-guards.js';
-
-// Re-export for backward compatibility
-export { VALID_HOOK_EVENTS, isNonEmptyString, isValidHookEventName };
+import { isNonEmptyString, isValidHookEventName } from '../utils/type-guards.js';
 
 export async function handleHookEvent(eventName: string, tty?: string): Promise<void> {
   const span = startPerf('handleHookEvent', { hook_event_name: eventName, has_tty: !!tty });

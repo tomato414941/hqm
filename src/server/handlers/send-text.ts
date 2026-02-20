@@ -1,11 +1,11 @@
 import type { WebSocket } from 'ws';
-import { getSessions } from '../../store/file-store.js';
+import { getSessionsLight } from '../../store/file-store.js';
 import type { Session } from '../../types/index.js';
 import { sendKeystrokeToTerminal, sendTextToTerminal } from '../../utils/send-text.js';
 import { isDangerousCommand } from '../security.js';
 
 async function findSessionById(sessionId: string): Promise<Session | undefined> {
-  const sessions = await getSessions();
+  const sessions = getSessionsLight();
   return sessions.find((s) => s.session_id === sessionId);
 }
 

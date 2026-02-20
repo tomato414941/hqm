@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { CODEX_MATCH_TOLERANCE_MS } from '../constants.js';
 import { logger } from '../utils/logger.js';
 import { readTailContent } from '../utils/transcript.js';
 import { getCodexSessionsDir } from './paths.js';
@@ -113,8 +114,6 @@ export function resetCodexTranscriptIndexCache(): void {
   transcriptIndexCache = undefined;
 }
 
-const MATCH_TOLERANCE_MS = 10_000;
-
 export function resolveCodexTranscriptPath(
   session: {
     transcript_path?: string;
@@ -137,7 +136,7 @@ export function resolveCodexTranscriptPath(
 
   for (const entry of transcripts) {
     const delta = Math.abs(entry.createdAt - sessionCreatedAt);
-    if (delta <= MATCH_TOLERANCE_MS && delta < bestDelta) {
+    if (delta <= CODEX_MATCH_TOLERANCE_MS && delta < bestDelta) {
       bestMatch = entry;
       bestDelta = delta;
     }

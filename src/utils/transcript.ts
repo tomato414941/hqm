@@ -11,6 +11,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { isCodexSessionId } from '../codex/paths.js';
+import { TAIL_READ_BYTES } from '../constants.js';
 import type { ConversationMessage } from '../types/index.js';
 import { logger } from './logger.js';
 import { getTranscriptPathFromRegistry } from './session-registry.js';
@@ -279,8 +280,6 @@ export function getAllMessages(
     return { messages: [], hasMore: false };
   }
 }
-
-const TAIL_READ_BYTES = 128 * 1024;
 
 /**
  * Read the tail portion of a file without loading the entire file.

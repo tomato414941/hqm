@@ -1,10 +1,10 @@
 import type { WebSocket } from 'ws';
-import { getSessions } from '../../store/file-store.js';
+import { getSessionsLight } from '../../store/file-store.js';
 import type { Session } from '../../types/index.js';
 import { focusSessionByContext } from '../../utils/focus.js';
 
 async function findSessionById(sessionId: string): Promise<Session | undefined> {
-  const sessions = await getSessions();
+  const sessions = getSessionsLight();
   return sessions.find((s) => s.session_id === sessionId);
 }
 

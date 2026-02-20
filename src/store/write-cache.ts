@@ -12,11 +12,16 @@ export class WriteCache {
   private cachedStore: StoreData | null = null;
   private writeTimer: ReturnType<typeof setTimeout> | null = null;
   private flushPromise: Promise<void> | null = null;
+  private lastWriteTimestampMs = 0;
 
   constructor(
     private readonly storeDir: string,
     private readonly storeFile: string
   ) {}
+
+  getLastWriteTimestampMs(): number {
+    return this.lastWriteTimestampMs;
+  }
 
   getCachedStore(): StoreData | null {
     return this.cachedStore;
@@ -52,6 +57,7 @@ export class WriteCache {
         const tmpFile = `${this.storeFile}.tmp.${process.pid}`;
         writeFileSync(tmpFile, JSON.stringify(data), { encoding: 'utf-8', mode: 0o600 });
         renameSync(tmpFile, this.storeFile);
+        this.lastWriteTimestampMs = Date.now();
         return true;
       } catch (error) {
         this.logWriteError(error, attempt);
@@ -181,4 +187,11 @@ export function resetStoreCache(): void {
   if (defaultInstance) {
     defaultInstance.resetStoreCache();
   }
+}
+
+/**
+ * Get the timestamp (ms) of the last successful write by this process
+ */
+export function getLastWriteTimestampMs(): number {
+  return defaultInstance?.getLastWriteTimestampMs() ?? 0;
 }

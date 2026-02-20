@@ -1,11 +1,11 @@
 import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { handleHookEvent } from '../src/hook/handler.js';
 import {
-  handleHookEvent,
   isNonEmptyString,
   isValidHookEventName,
   VALID_HOOK_EVENTS,
-} from '../src/hook/handler.js';
+} from '../src/utils/type-guards.js';
 
 // Mock the file-store module
 vi.mock('../src/store/file-store.js', () => ({

@@ -1,10 +1,10 @@
 import type { WebSocket } from 'ws';
-import { getSessions } from '../../store/file-store.js';
+import { getSessionsLight } from '../../store/file-store.js';
 import type { HistoryResponse, Session } from '../../types/index.js';
 import { getAllMessagesAsync, getTranscriptPath } from '../../utils/transcript.js';
 
 async function findSessionById(sessionId: string): Promise<Session | undefined> {
-  const sessions = await getSessions();
+  const sessions = getSessionsLight();
   return sessions.find((s) => s.session_id === sessionId);
 }
 

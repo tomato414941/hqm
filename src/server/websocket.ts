@@ -1,6 +1,6 @@
 import type { IncomingMessage } from 'node:http';
 import type { WebSocket, WebSocketServer } from 'ws';
-import { getProjects, getSessions } from '../store/file-store.js';
+import { getProjects, getSessionsLight } from '../store/file-store.js';
 import type { Project, Session } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { handleFocusCommand } from './handlers/focus.js';
@@ -66,6 +66,8 @@ function handleWebSocketMessage(ws: WebSocket, data: Buffer): void {
   const handler = messageHandlers[message.type];
   if (handler) {
     handler(ws, message);
+  } else {
+    logger.warn('Unknown WebSocket message type', { type: message.type });
   }
 }
 
@@ -78,8 +80,8 @@ export function broadcastToClients(wss: WebSocketServer, message: BroadcastMessa
   }
 }
 
-async function sendSessionsToClient(ws: WebSocket): Promise<void> {
-  const sessions = await getSessions();
+function sendSessionsToClient(ws: WebSocket): void {
+  const sessions = getSessionsLight();
   const projects = getProjects();
   ws.send(JSON.stringify({ type: 'sessions', data: sessions, projects }));
 }

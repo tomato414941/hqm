@@ -1,9 +1,22 @@
 import { basename, dirname } from 'node:path';
 import chokidar from 'chokidar';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SESSION_UPDATE_DEBOUNCE_MS } from '../constants.js';
+import { SELF_WRITE_SUPPRESSION_MS, SESSION_UPDATE_DEBOUNCE_MS } from '../constants.js';
 import { runCleanupOnce, startCleanupLoop, stopCleanupLoop } from '../store/cleanup-loop.js';
-import { getProjects, getSessions, getStorePath } from '../store/file-store.js';
+import {
+  getProjects,
+  getSessionsLight,
+  getStorePath,
+  refreshSessionData,
+} from '../store/file-store.js';
+import {
+  offRefresh,
+  onRefresh,
+  runRefreshOnce,
+  startRefreshLoop,
+  stopRefreshLoop,
+} from '../store/refresh-loop.js';
+import { getLastWriteTimestampMs } from '../store/write-cache.js';
 import type { Project, Session } from '../types/index.js';
 
 export function useSessions(): {
@@ -18,9 +31,9 @@ export function useSessions(): {
   const [error, setError] = useState<Error | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const loadSessions = useCallback(() => {
+  const loadSessionsLight = useCallback(() => {
     try {
-      const data = getSessions();
+      const data = getSessionsLight();
       const projectData = getProjects();
       setSessions(data);
       setProjects(projectData);
@@ -37,42 +50,56 @@ export function useSessions(): {
       clearTimeout(debounceTimerRef.current);
     }
     debounceTimerRef.current = setTimeout(() => {
-      loadSessions();
+      loadSessionsLight();
       debounceTimerRef.current = null;
     }, SESSION_UPDATE_DEBOUNCE_MS);
-  }, [loadSessions]);
+  }, [loadSessionsLight]);
 
   useEffect(() => {
-    // Initial load (immediate, no debounce)
-    loadSessions();
+    // Initial load: full refresh to get Codex statuses + transcripts
+    refreshSessionData();
+    loadSessionsLight();
     void runCleanupOnce();
     startCleanupLoop();
+    startRefreshLoop();
 
-    // Watch file changes (debounced)
+    // Refresh loop listener: reload light data when heavy refresh completes
+    const handleRefresh = () => loadSessionsLight();
+    onRefresh(handleRefresh);
+
+    // Initial heavy refresh
+    runRefreshOnce();
+
+    // Watch file changes (debounced, with self-write suppression)
     const storePath = getStorePath();
     const storeBasename = basename(storePath);
     const watcher = chokidar.watch(dirname(storePath), {
       persistent: true,
       ignoreInitial: true,
-      usePolling: false, // Use native inotify on Linux instead of polling
+      usePolling: false,
       depth: 0,
     });
 
-    watcher.on('change', (filePath) => {
-      if (basename(filePath) === storeBasename) debouncedLoadSessions();
-    });
-    watcher.on('add', (filePath) => {
-      if (basename(filePath) === storeBasename) debouncedLoadSessions();
-    });
+    const handleChange = (filePath: string) => {
+      if (basename(filePath) !== storeBasename) return;
+      const elapsed = Date.now() - getLastWriteTimestampMs();
+      if (elapsed < SELF_WRITE_SUPPRESSION_MS) return;
+      debouncedLoadSessions();
+    };
+
+    watcher.on('change', handleChange);
+    watcher.on('add', handleChange);
 
     return () => {
       watcher.close();
       stopCleanupLoop();
+      stopRefreshLoop();
+      offRefresh(handleRefresh);
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [loadSessions, debouncedLoadSessions]);
+  }, [loadSessionsLight, debouncedLoadSessions]);
 
   return { sessions, projects, loading, error };
 }

@@ -872,7 +872,7 @@ describe('file-store', () => {
 
   describe('Codex session status detection', () => {
     it('should set running when transcript mtime is recent', async () => {
-      const { writeStore, getSessions, flushPendingWrites, resetStoreCache } = await import(
+      const { writeStore, refreshSessionData, flushPendingWrites, resetStoreCache } = await import(
         '../src/store/file-store.js'
       );
       const now = new Date();
@@ -904,13 +904,13 @@ describe('file-store', () => {
       await flushPendingWrites();
       resetStoreCache();
 
-      const sessions = getSessions();
+      const sessions = refreshSessionData();
       const codexSession = sessions.find((s) => s.session_id === 'codex-n-1');
       expect(codexSession?.status).toBe('running');
     });
 
     it('should set stopped when mtime is old and last entry is agent', async () => {
-      const { writeStore, getSessions, flushPendingWrites, resetStoreCache } = await import(
+      const { writeStore, refreshSessionData, flushPendingWrites, resetStoreCache } = await import(
         '../src/store/file-store.js'
       );
       const now = new Date();
@@ -946,13 +946,13 @@ describe('file-store', () => {
       await flushPendingWrites();
       resetStoreCache();
 
-      const sessions = getSessions();
+      const sessions = refreshSessionData();
       const codexSession = sessions.find((s) => s.session_id === 'codex-n-2');
       expect(codexSession?.status).toBe('stopped');
     });
 
     it('should keep running when mtime is old but last entry is user', async () => {
-      const { writeStore, getSessions, flushPendingWrites, resetStoreCache } = await import(
+      const { writeStore, refreshSessionData, flushPendingWrites, resetStoreCache } = await import(
         '../src/store/file-store.js'
       );
       const now = new Date();
@@ -994,7 +994,7 @@ describe('file-store', () => {
       await flushPendingWrites();
       resetStoreCache();
 
-      const sessions = getSessions();
+      const sessions = refreshSessionData();
       const codexSession = sessions.find((s) => s.session_id === 'codex-n-3');
       expect(codexSession?.status).toBe('running');
     });

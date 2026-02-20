@@ -5,7 +5,9 @@ export {
   clearSessions,
   getSession,
   getSessions,
+  getSessionsLight,
   getStorePath,
+  refreshSessionData,
 } from './store/file-store.js';
 export type {
   HookEvent,

@@ -1,9 +1,9 @@
-import { getSessions } from '../../store/file-store.js';
+import { refreshSessionData } from '../../store/file-store.js';
 import { abbreviateHomePath } from '../../utils/path.js';
 import { getStatusDisplay } from '../../utils/status-display.js';
 
 export async function listAction(): Promise<void> {
-  const sessions = await getSessions();
+  const sessions = refreshSessionData();
   if (sessions.length === 0) {
     console.log('No active sessions');
     return;

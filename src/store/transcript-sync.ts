@@ -1,9 +1,23 @@
 import { statSync } from 'node:fs';
 import { buildCodexTranscriptIndex, resolveCodexTranscriptPath } from '../codex/registry.js';
+import { MAX_MTIME_CACHE_SIZE } from '../constants.js';
 import type { Session, StoreData } from '../types/index.js';
 import { getLastAssistantMessage, getTranscriptPath } from '../utils/transcript.js';
 
 const mtimeCache = new Map<string, { mtimeMs: number; lastMessage: string | undefined }>();
+
+function mtimeCacheSet(
+  key: string,
+  value: { mtimeMs: number; lastMessage: string | undefined }
+): void {
+  mtimeCache.set(key, value);
+  if (mtimeCache.size > MAX_MTIME_CACHE_SIZE) {
+    const firstKey = mtimeCache.keys().next().value;
+    if (firstKey !== undefined) {
+      mtimeCache.delete(firstKey);
+    }
+  }
+}
 
 export function clearTranscriptMtimeCache(): void {
   mtimeCache.clear();
@@ -41,7 +55,7 @@ export function syncTranscripts(sessions: Session[], store: StoreData): boolean 
         message = cached.lastMessage;
       } else {
         message = getLastAssistantMessage(transcriptPath);
-        mtimeCache.set(transcriptPath, { mtimeMs, lastMessage: message });
+        mtimeCacheSet(transcriptPath, { mtimeMs, lastMessage: message });
       }
     } catch {
       // File may have been removed between path resolution and stat
